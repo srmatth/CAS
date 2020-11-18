@@ -1,0 +1,119 @@
+# Get summaries by variable and level for a selected data set
+
+#### Setup ----
+
+# Load libraries
+library(dplyr)
+library(stringr)
+library(data.table)
+library(tidyr)
+library(ggplot2)
+
+# Choose the data set that you wish to use, "bi", "pd", or "coll"
+data <- "bi"
+
+# set the relative directory of the data and the output (with forward slash at the end)
+data_loc <- "data/"
+output_loc <- NULL
+
+df <- fread(str_c(data_loc, data, ".csv"))
+
+#### Factor Summarizing ----
+fac_sum <- df %>%
+  pivot_longer(
+    cols = str_c("X_VAR", 1:46),
+    names_to = "variable",
+    values_to = "level"
+  ) %>%
+  group_by(
+    variable,
+    level
+  ) %>%
+  summarize(
+    count = n(),
+    min_earned_exposure = min(EARNED_EXPOSURE),
+    q1_earned_exposure = quantile(EARNED_EXPOSURE, .25),
+    med_earned_exposure = quantile(EARNED_EXPOSURE, .5),
+    avg_earned_exposure = mean(EARNED_EXPOSURE),
+    q3_earned_exposure = quantile(EARNED_EXPOSURE, .75),
+    max_earned_exposure = max(EARNED_EXPOSURE),
+    tot_earned_exposure = sum(EARNED_EXPOSURE),
+    min_ultimate_amount = min(ULTIMATE_AMOUNT),
+    q1_ultimate_amount = quantile(ULTIMATE_AMOUNT, .25),
+    med_ultimate_amount = quantile(ULTIMATE_AMOUNT, .5),
+    avg_ultimate_amount = mean(ULTIMATE_AMOUNT),
+    q3_ultimate_amount = quantile(ULTIMATE_AMOUNT, .75),
+    max_ultimate_amount = max(ULTIMATE_AMOUNT),
+    tot_ultimate_amount = sum(ULTIMATE_AMOUNT),
+    min_ultimate_count = min(ULTIMATE_CLAIM_COUNT),
+    q1_ultimate_count = quantile(ULTIMATE_CLAIM_COUNT, .25),
+    med_ultimate_count = quantile(ULTIMATE_CLAIM_COUNT, .5),
+    avg_ultimate_count = mean(ULTIMATE_CLAIM_COUNT),
+    q3_ultimate_count = quantile(ULTIMATE_CLAIM_COUNT, .75),
+    max_ultimate_count = max(ULTIMATE_CLAIM_COUNT),
+    tot_ultimate_count = sum(ULTIMATE_CLAIM_COUNT)
+  ) %>%
+  ungroup()
+
+# Save the summary
+fwrite(fac_sum, str_c(output_loc, data, "_fac_sum.csv"))
+
+#### Numerical Summarizing ----
+
+num_sum <- summary(df$EARNED_EXPOSURE) %>%
+  rbind(
+    summary(df$ULTIMATE_CLAIM_COUNT)
+  ) %>%
+  rbind(
+    summary(ULTIMATE_AMOUNT)
+  ) %>% 
+  magrittr::set_rownames(1:nrow(.)) %>%
+  as_tibble() %>%
+  mutate(variable = c("EARNED_EXPOSURE", "ULTIMATE_CLAIM_COUNT", "ULTIMATE_AMOUNT")) %>%
+  select(variable, everything())
+
+# save the summary
+fwrite(num_sum, str_c(output_loc, data, "_num_sum.csv"))
+
+#### Rows with Claims ----
+
+# filter the data and create the new column of severity
+raw_data <- df %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  mutate(severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT)
+
+# open the pdf for editing
+pdf(str_c(data, "_severity_violin_plots.pdf"))
+
+# note that variables 19, 34, and 46 have too many levels to plot
+for (i in stringr::str_c("X_VAR", c(1:18, 20:33, 35:45))) {
+  summary <- count(raw_data, !!rlang::sym(i))
+  
+  p <- ggplot(raw_data) +
+    geom_violin(aes(x = as.factor(!!rlang::sym(i)), y = severity)) +
+    xlab(i) +
+    ylab("Severity") +
+    theme_classic() 
+  if (nrow(summary) < 13) {
+    p <- p +
+      ggtitle(stringr::str_c("Severity vs. ",i), "(Counts for Each Level in Red)") +
+      geom_text(
+        data = summary, 
+        aes(x = as.factor(!!rlang::sym(i)), 
+            y = 8e05,
+            label = n),
+        colour = "red"
+      )
+  } else {
+    p <- p +
+      ggtitle(stringr::str_c("Severity vs. ",i))
+  }
+  
+  print(p)
+}
+
+dev.off()
+
+#### Quit R ----
+
+q(save = "no")
