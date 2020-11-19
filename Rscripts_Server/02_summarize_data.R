@@ -2,12 +2,19 @@
 
 #### Setup ----
 
+usethis::ui_info("Loading Libraries...")
+
 # Load libraries
 library(dplyr)
 library(stringr)
 library(data.table)
 library(tidyr)
 library(ggplot2)
+library(usethis)
+
+ui_done("Finished Loading Libraries.")
+
+ui_info("Initializing values and reading in the data...")
 
 # Choose the data set that you wish to use, "bi", "pd", or "coll"
 data <- "bi"
@@ -18,13 +25,25 @@ output_loc <- NULL
 
 df <- fread(str_c(data_loc, data, ".csv"))
 
+ui_done("Data in!")
+
 #### Factor Summarizing ----
+ui_info("Beginning to summarize Factor Variables...")
 fac_sum <- df %>%
+  mutate_at(str_c("X_VAR", 1:46), as.character) %>%
+  select(
+    EARNED_EXPOSURE,
+    ULTIMATE_AMOUNT,
+    ULTIMATE_CLAIM_COUNT,
+    str_c("X_VAR", c(1:18, 20:33, 35:45))
+  ) %>%
   pivot_longer(
-    cols = str_c("X_VAR", 1:46),
+    cols = str_c("X_VAR", c(1:18, 20:33, 35:45)),
     names_to = "variable",
     values_to = "level"
-  ) %>%
+  ) 
+print(nrow(fac_sum))
+fac_sum <- fac_sum %>%
   group_by(
     variable,
     level
@@ -56,10 +75,13 @@ fac_sum <- df %>%
   ungroup()
 
 # Save the summary
+ui_info("Saving factor summaries...")
 fwrite(fac_sum, str_c(output_loc, data, "_fac_sum.csv"))
+ui_done("Finished factor summaries!")
 
 #### Numerical Summarizing ----
 
+ui_info("computing summary statistics for numeric variables...")
 num_sum <- summary(df$EARNED_EXPOSURE) %>%
   rbind(
     summary(df$ULTIMATE_CLAIM_COUNT)
@@ -73,15 +95,20 @@ num_sum <- summary(df$EARNED_EXPOSURE) %>%
   select(variable, everything())
 
 # save the summary
+ui_info("saving numeric variable summaries...")
 fwrite(num_sum, str_c(output_loc, data, "_num_sum.csv"))
+ui_done("Done with the numeric summaries and data saved!")
 
 #### Rows with Claims ----
+
+ui_info("Beginning summaries for filtered data...")
 
 # filter the data and create the new column of severity
 raw_data <- df %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
   mutate(severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT)
 
+ui_info("Beginning Violin Plots")
 # open the pdf for editing
 pdf(str_c(data, "_severity_violin_plots.pdf"))
 
@@ -113,6 +140,7 @@ for (i in stringr::str_c("X_VAR", c(1:18, 20:33, 35:45))) {
 }
 
 dev.off()
+ui_done("Vioilin Plots done and images saved!")
 
 #### Quit R ----
 
