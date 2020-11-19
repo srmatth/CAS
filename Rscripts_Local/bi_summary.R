@@ -36,7 +36,7 @@ all_bi <- bi_1 %>%
 
 beepr::beep(9)
 
-# write a gather function since pivot_wider does not work in 
+# write a gather function since pivot_wider does not work in Spark
 sdf_gather <- function(data, key = "key", value = "value", ...) {
   cols <- list(...) %>% unlist()
   

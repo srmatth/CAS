@@ -11,8 +11,19 @@ library(data.table)
 library(tidyr)
 library(ggplot2)
 library(usethis)
+library(sparklyr)
+library(tictoc)
+library(BBmisc)
 
 ui_done("Finished Loading Libraries.")
+
+ui_info("Starting Spark")
+
+conf <- list()
+conf$`sparklyr.cores.local` <- 4
+conf$`sparklyr.shell.driver-memory` <- "4G"
+conf$spark.memory.fraction <- 0.9
+sc <- spark_connect(master = "local", version = "2.4.5", config = conf)
 
 ui_info("Initializing values and reading in the data...")
 
@@ -28,51 +39,66 @@ df <- fread(str_c(data_loc, data, ".csv"))
 ui_done("Data in!")
 
 #### Factor Summarizing ----
+
+# write a gather function since pivot_wider does not work in Spark
+sdf_gather <- function(data, key = "key", value = "value", ...) {
+  cols <- list(...) %>% unlist()
+  
+  # Explode with map (same as stack) requires multiple aliases so
+  # dplyr mutate won't work for us here.
+  expr <- list(paste(
+    "explode(map(",
+    paste("'", cols, "',`",  cols, "`", sep = "", collapse = ","),
+    ")) as (", key, ",", value, ")", sep = ""))
+  
+  keys <- data %>% colnames() %>% setdiff(cols) %>% as.list()
+  
+  data %>%
+    spark_dataframe() %>% 
+    sparklyr::invoke("selectExpr", c(keys, expr)) %>% 
+    sdf_register()
+}
+
+ui_info("Transferring Data to Spark Cluster")
+df_s <- spark_read_csv(sc = sc, name = "df_s", path = str_c(data_loc, data, ".csv"))
+
 ui_info("Beginning to summarize Factor Variables...")
-fac_sum <- df %>%
+fac_sum <- df_s %>%
+  dplyr::mutate(
+    EARNED_EXPOSURE = as.numeric(EARNED_EXPOSURE),
+    ULTIMATE_AMOUNT = as.numeric(ULTIMATE_AMOUNT),
+    ULTIMATE_CLAIM_COUNT = as.numeric(ULTIMATE_CLAIM_COUNT)
+  ) %>%
   mutate_at(str_c("X_VAR", 1:46), as.character) %>%
-  select(
-    EARNED_EXPOSURE,
-    ULTIMATE_AMOUNT,
-    ULTIMATE_CLAIM_COUNT,
-    str_c("X_VAR", c(1:18, 20:33, 35:45))
-  ) %>%
-  pivot_longer(
-    cols = str_c("X_VAR", c(1:18, 20:33, 35:45)),
-    names_to = "variable",
-    values_to = "level"
-  ) 
-print(nrow(fac_sum))
-fac_sum <- fac_sum %>%
-  group_by(
-    variable,
-    level
-  ) %>%
+  sdf_gather("variable", "level", str_c("X_VAR", 1:46)) %>%
+  group_by(variable, level) %>%
   summarize(
-    count = n(),
+    count = dplyr::n(),
     min_earned_exposure = min(EARNED_EXPOSURE),
-    q1_earned_exposure = quantile(EARNED_EXPOSURE, .25),
-    med_earned_exposure = quantile(EARNED_EXPOSURE, .5),
+    q1_earned_exposure = percentile_approx(EARNED_EXPOSURE, .25),
+    med_earned_exposure = percentile_approx(EARNED_EXPOSURE, .5),
     avg_earned_exposure = mean(EARNED_EXPOSURE),
-    q3_earned_exposure = quantile(EARNED_EXPOSURE, .75),
+    q3_earned_exposure = percentile_approx(EARNED_EXPOSURE, .75),
     max_earned_exposure = max(EARNED_EXPOSURE),
     tot_earned_exposure = sum(EARNED_EXPOSURE),
     min_ultimate_amount = min(ULTIMATE_AMOUNT),
-    q1_ultimate_amount = quantile(ULTIMATE_AMOUNT, .25),
-    med_ultimate_amount = quantile(ULTIMATE_AMOUNT, .5),
+    q1_ultimate_amount = percentile_approx(ULTIMATE_AMOUNT, .25),
+    med_ultimate_amount = percentile_approx(ULTIMATE_AMOUNT, .5),
     avg_ultimate_amount = mean(ULTIMATE_AMOUNT),
-    q3_ultimate_amount = quantile(ULTIMATE_AMOUNT, .75),
+    q3_ultimate_amount = percentile_approx(ULTIMATE_AMOUNT, .75),
     max_ultimate_amount = max(ULTIMATE_AMOUNT),
     tot_ultimate_amount = sum(ULTIMATE_AMOUNT),
     min_ultimate_count = min(ULTIMATE_CLAIM_COUNT),
-    q1_ultimate_count = quantile(ULTIMATE_CLAIM_COUNT, .25),
-    med_ultimate_count = quantile(ULTIMATE_CLAIM_COUNT, .5),
+    q1_ultimate_count = percentile_approx(ULTIMATE_CLAIM_COUNT, .25),
+    med_ultimate_count = percentile_approx(ULTIMATE_CLAIM_COUNT, .5),
     avg_ultimate_count = mean(ULTIMATE_CLAIM_COUNT),
-    q3_ultimate_count = quantile(ULTIMATE_CLAIM_COUNT, .75),
+    q3_ultimate_count = percentile_approx(ULTIMATE_CLAIM_COUNT, .75),
     max_ultimate_count = max(ULTIMATE_CLAIM_COUNT),
     tot_ultimate_count = sum(ULTIMATE_CLAIM_COUNT)
   ) %>%
-  ungroup()
+  ungroup() %>%
+  arrange(variable, level) %>%
+  collect()
 
 # Save the summary
 ui_info("Saving factor summaries...")
