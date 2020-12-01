@@ -1,5 +1,20 @@
 # Get summaries by variable and level for a selected data set
 
+#### User Inputs ----
+
+# 1. Choose the data set that you wish to use, "bi", "pd", or "coll"
+data <- "bi"
+
+# 2. set the relative directory of the data and the output (with forward slash at the end)
+data_loc <- "data/"
+output_loc <- NULL
+
+# 3. set the configuration for the spark cluster
+conf <- list()
+conf$`sparklyr.cores.local` <- 4
+conf$`sparklyr.shell.driver-memory` <- "4G"
+conf$spark.memory.fraction <- 0.9
+
 #### Setup ----
 
 usethis::ui_info("Loading Libraries...")
@@ -19,20 +34,9 @@ ui_done("Finished Loading Libraries.")
 
 ui_info("Starting Spark")
 
-conf <- list()
-conf$`sparklyr.cores.local` <- 4
-conf$`sparklyr.shell.driver-memory` <- "4G"
-conf$spark.memory.fraction <- 0.9
 sc <- spark_connect(master = "local", version = "2.4.5", config = conf)
 
 ui_info("Initializing values and reading in the data...")
-
-# Choose the data set that you wish to use, "bi", "pd", or "coll"
-data <- "bi"
-
-# set the relative directory of the data and the output (with forward slash at the end)
-data_loc <- "data/"
-output_loc <- NULL
 
 df <- fread(str_c(data_loc, data, ".csv"))
 
@@ -113,7 +117,7 @@ num_sum <- summary(df$EARNED_EXPOSURE) %>%
     summary(df$ULTIMATE_CLAIM_COUNT)
   ) %>%
   rbind(
-    summary(ULTIMATE_AMOUNT)
+    summary(df$ULTIMATE_AMOUNT)
   ) %>% 
   magrittr::set_rownames(1:nrow(.)) %>%
   as_tibble() %>%
@@ -168,6 +172,7 @@ for (i in stringr::str_c("X_VAR", c(1:18, 20:33, 35:45))) {
 dev.off()
 ui_done("Vioilin Plots done and images saved!")
 
-#### Quit R ----
+#### Quit R and Spark ----
 
+spark_disconnect(sc)
 q(save = "no")

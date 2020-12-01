@@ -2,7 +2,13 @@
 
 # Please note that this script needs at least 10G of RAM to run
 
-#### Setup and initialization ----
+#### User Inputs ----
+
+# 1. Set the directory where the raw data is stored and output
+data_dir <- "~/CAS/data/Data"
+output_dir <- "data"
+
+#### Setup ----
 
 # Load necessary libraries
 library(dplyr)
@@ -12,9 +18,7 @@ library(usethis)
 library(data.table)
 library(fs)
 
-# Set the directory where the raw data is stored and initialize the column names
-data_dir <- "~/CAS/data/Data"
-output_dir <- "data"
+# Set the Column Names for the data
 colnames <- c(
   "EARNED_EXPOSURE",
   "ULTIMATE_AMOUNT",
