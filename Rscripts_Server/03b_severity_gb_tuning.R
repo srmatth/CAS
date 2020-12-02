@@ -1,4 +1,34 @@
-#!/usr/bin/env Rscript
+# Tune Gradient Boosted Models to predict Amount per Claim (Severity)
+
+#### User Inputs ----
+
+# 1. Choose the data set that you wish to use, "bi", "pd", or "coll"
+data <- "bi"
+
+# 2. set the relative directory of the data and the output (with forward slash at the end)
+data_loc <- "data/"
+output_loc <- NULL
+
+# 3. Determine whether to predict the severity or the log of the severity
+response <- "severity"
+# response <- "log_severity"
+
+# 4. Create a tuning grid
+grid <- expand.grid(
+  list(
+    ntrees = c(100, 300, 500, 1000, 3000),
+    max_depth = c(1,3,5, 7, 10, 15, 20, 30),
+    min_split_improvement = c(.01, .001, .0001, .00001),
+    mtries = c(-1, 7, 20),
+    histogram_type = c("UniformAdaptive", "Random"),
+    sample_rate = c(.632),
+    categorical_encoding = c("EnumLimited", "Eigen", "OneHotInternal"),
+    col_sample_rate_per_tree = c(.8),
+    seed = 16
+  ), 
+  stringsAsFactors = FALSE
+)
+
 
 library(h2o)
 library(dplyr)
@@ -8,38 +38,36 @@ library(tictoc)
 h2o::h2o.init()
 
 # read the data into memory
-bi <- data.table::fread("bi_severity.csv", stringsAsFactors = TRUE) %>%
-  dplyr::mutate(log_sev = log(severity)) %>%
-  dplyr::select(-severity)
+bi <- data.table::fread("data/bi.csv", stringsAsFactors = TRUE)
 print("Data in!")
 
 # select the columns we want from the data
 # and make everything a factor except the response and EARNED_EXPOSURE
-#bi <- bi %>%
-#  dplyr::mutate(
-#    loss_cost = ULTIMATE_AMOUNT / EARNED_EXPOSURE
-#  ) %>%
-#  dplyr::select(
-#    -V1,
-#    -ULTIMATE_AMOUNT,
-#    -ULTIMATE_CLAIM_COUNT,
-#    -EARNED_EXPOSURE,
-#    -CLAIM,
-#    -X_VAR2,
-#    -X_VAR19,
-#    -X_VAR34,
-#    -X_VAR46,
-#    -form
-#  ) %>% 
-#  dplyr::filter(loss_cost > 0) %>%
-#  dplyr::mutate_at(
-#    .vars = stringr::str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
-#    .funs = as.factor
-#  )
+bi <- bi %>%
+  dplyr::mutate(
+    loss_cost = ULTIMATE_AMOUNT / EARNED_EXPOSURE
+  ) %>%
+  dplyr::select(
+    -V1,
+    -ULTIMATE_AMOUNT,
+    -ULTIMATE_CLAIM_COUNT,
+    -EARNED_EXPOSURE,
+    -CLAIM,
+    -X_VAR2,
+    -X_VAR19,
+    -X_VAR34,
+    -X_VAR46,
+    -form
+  ) %>% 
+  dplyr::filter(loss_cost >= 0) %>%
+  dplyr::mutate_at(
+    .vars = stringr::str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
+    .funs = as.factor
+  )
 
 # split into training, testing, and validation frames
 bi_hf <- h2o::as.h2o(bi) %>%
- h2o::h2o.splitFrame(ratios = c(.7, .1), seed = 16)
+  h2o::h2o.splitFrame(ratios = c(.5, .25), seed = 16)
 bi_train <- bi_hf[[1]]
 bi_validate <- bi_hf[[2]]
 bi_test <- bi_hf[[3]]
@@ -47,13 +75,14 @@ print("data split!")
 
 ## create a tuning grid
 grid <- list(
-  ntrees = c(100, 300, 500, 1000, 3000),
-  max_depth = c(1,3,5, 7, 10, 15, 20, 30),
-  min_split_improvement = c(.01, .001, .0001, .00001),
-  mtries = c(-1, 7, 20),
-  histogram_type = c("UniformAdaptive", "Random"),
+  ntrees = c(1000, 1500),
+  max_depth = c(1, 2, 3, 5, 7, 10),
+  learn_rate = c(.001, .0001),
+  min_split_improvement = c(.0001),
+  distribution = c("gaussian", "huber"),
   sample_rate = c(.632),
-  categorical_encoding = c("EnumLimited", "Eigen", "OneHotInternal"),
+  nbins_cats = c(56),
+  categorical_encoding = c("Eigen", "LabelEncoder"),
   col_sample_rate_per_tree = c(.8),
   seed = 16
 ) %>%
@@ -67,32 +96,26 @@ varimp <- data.frame(stringsAsFactors = FALSE)
 # run the loop across all rows of the training grid
 print("starting for loop....")
 for (i in 1:nrow(grid)) {
-  # Sys.sleep(10)
-  # h2o.init()
-  # bi_hf <- h2o::as.h2o(bi) %>%
-  #   h2o.splitFrame(ratios = c(.7, .1), seed = 16)
-  # bi_train <- bi_hf[[1]]
-  # bi_validate <- bi_hf[[2]]
-  # bi_test <- bi_hf[[3]]
-  
   grid_sub <- grid %>% dplyr::slice(i)
   
   tryCatch({
     usethis::ui_info("Starting model {i}")
     tic(stringr::str_c("model", i, sep = " "))
-    tmp_mod <- h2o::h2o.randomForest(
-      y = "log_sev",
+    tmp_mod <- h2o::h2o.gbm(
+      y = "loss_cost",
       training_frame = bi_train,
       validation_frame = bi_test,
       nfolds = 5,
+      distribution = grid_sub$distribution,
       model_id = "temp_gb_mod",
       ntrees = grid_sub$ntrees,
       max_depth = grid_sub$max_depth,
-      mtries = grid_sub$mtries,
+      learn_rate = grid_sub$learn_rate,
+      min_rows = grid_sub$min_rows,
       min_split_improvement = grid_sub$min_split_improvement,
       sample_rate = grid_sub$sample_rate,
+      nbins = grid_sub$nbins,
       categorical_encoding = grid_sub$categorical_encoding,
-      histogram_type = grid_sub$histogram_type,
       seed = grid_sub$seed,
       col_sample_rate_per_tree = grid_sub$col_sample_rate_per_tree
     )
@@ -104,13 +127,16 @@ for (i in 1:nrow(grid)) {
       mod_num = i,
       time_to_create = time$toc - time$tic,
       nfolds = 5,
+      distribution = grid_sub$distribution,
+      model_id = "temp_forest_mod",
       ntrees = grid_sub$ntrees,
       max_depth = grid_sub$max_depth,
-      mtries = grid_sub$mtries,
+      learn_rate = grid_sub$learn_rate,
+      min_rows = grid_sub$min_rows,
       min_split_improvement = grid_sub$min_split_improvement,
       sample_rate = grid_sub$sample_rate,
+      nbins = grid_sub$nbins,
       categorical_encoding = grid_sub$categorical_encoding,
-      histogram_type = grid_sub$histogram_type,
       seed = grid_sub$seed,
       col_sample_rate_per_tree = grid_sub$col_sample_rate_per_tree,
       r_2 = h2o.r2(tmp_mod),
@@ -132,16 +158,18 @@ for (i in 1:nrow(grid)) {
     
     results <- rbind(results, results_tmp)
     varimp <- rbind(varimp, varimp_tmp)
-    readr::write_csv(varimp, "gb_tuning_varimp_log.csv")
-    readr::write_csv(results, "gb_tuning_results_log.csv")
     usethis::ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
-    usethis::ui_oops("Model {i} failed! {e}")
+    usethis::ui_oops("Model {i} failed!")
   })
-  print("shutdown h2o")
-  h2o.shutdown(prompt = FALSE)
 }
+
+# write the results to CSV files
+print("writing results...")
+readr::write_csv(varimp, stringr::str_c("results_gb_varimp_", Sys.date(), ".csv"))
+readr::write_csv(results, stringr::str_c("results_gb_metrics_", Sys.date(), ".csv"))
+
 
 # terminate R
 q()
