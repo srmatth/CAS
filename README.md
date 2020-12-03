@@ -29,11 +29,9 @@ For most of our analyses, these are simply filtered out, but a table describing 
 |BI|30,342,067|100%|3,830,558|634,080,483|100.00%|32,293|100.00%|
 |Subset of raw_1 with 0 exposures|6,724,652|22.16%|-|6,958,737|1.10%|367|1.14%|
 |Subset of raw_1 with negative exposures|3,885,178|12.80%|(33)|10,848,560|1.71%|606|1.88%|
-|||||||||
 |PD|20,201,841|100.00%|2,665,037|520,665,847|100.00%|151,842|100.00%|
 |Subset of raw_2 with 0 exposures|4,138,323|20.48%|- |6,981,221|1.34%|1,898|1.25%|
 |Subset of raw_2 with negative exposures|2,590,939|12.83%|(129)|9,330,567|1.79%|2,487|1.64%|
-|||||||||
 |COLL|30,285,873|100.00%|3,835,828|443,291,671|100.00%|135,419|100.00%|
 |Subset of raw_3 with 0 exposures|6,634,314|21.91%|- |5,078,430|1.15%|1,621|1.20%|
 |Subset of raw_3 with negative exposures|3,889,473|12.84%|(118)|7,738,811|1.75%|2,291|1.69%|
