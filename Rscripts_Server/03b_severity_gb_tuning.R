@@ -16,85 +16,63 @@ response <- "severity"
 # 4. Create a tuning grid
 grid <- expand.grid(
   list(
-    ntrees = c(100, 300, 500, 1000, 3000),
-    max_depth = c(1,3,5, 7, 10, 15, 20, 30),
-    min_split_improvement = c(.01, .001, .0001, .00001),
-    mtries = c(-1, 7, 20),
-    histogram_type = c("UniformAdaptive", "Random"),
+    ntrees = c(300, 500, 1000),
+    max_depth = c(1, 2, 3, 5, 7, 10),
+    learn_rate = c(.001, .0001),
+    min_split_improvement = c(.0001),
+    distribution = c("gaussian"),
     sample_rate = c(.632),
-    categorical_encoding = c("EnumLimited", "Eigen", "OneHotInternal"),
+    nbins_cats = c(56),
+    categorical_encoding = c("Eigen", "LabelEncoder"),
     col_sample_rate_per_tree = c(.8),
     seed = 16
-  ), 
+  ),
   stringsAsFactors = FALSE
 )
 
+#### Setup ----
 
+usethis::ui_info("Loading libraries")
 library(h2o)
-library(dplyr)
 library(tictoc)
+library(usethis)
+library(dplyr)
+library(readr)
+library(data.table)
 
 # start the h2o cluster
 h2o::h2o.init()
 
-# read the data into memory
-bi <- data.table::fread("data/bi.csv", stringsAsFactors = TRUE)
-print("Data in!")
+#### Data Loading and Manipulating ----
 
-# select the columns we want from the data
-# and make everything a factor except the response and EARNED_EXPOSURE
-bi <- bi %>%
-  dplyr::mutate(
-    loss_cost = ULTIMATE_AMOUNT / EARNED_EXPOSURE
-  ) %>%
-  dplyr::select(
-    -V1,
-    -ULTIMATE_AMOUNT,
-    -ULTIMATE_CLAIM_COUNT,
-    -EARNED_EXPOSURE,
-    -CLAIM,
-    -X_VAR2,
-    -X_VAR19,
-    -X_VAR34,
-    -X_VAR46,
-    -form
-  ) %>% 
-  dplyr::filter(loss_cost >= 0) %>%
-  dplyr::mutate_at(
-    .vars = stringr::str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
-    .funs = as.factor
+ui_info("Initializing values and reading in the data...")
+
+df <- fread(str_c(data_loc, data, ".csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  mutate(
+    severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT,
+    log_severity = log(severity)
   )
 
-# split into training, testing, and validation frames
-bi_hf <- h2o::as.h2o(bi) %>%
-  h2o::h2o.splitFrame(ratios = c(.5, .25), seed = 16)
-bi_train <- bi_hf[[1]]
-bi_validate <- bi_hf[[2]]
-bi_test <- bi_hf[[3]]
-print("data split!")
+ui_done("Data in!")
 
-## create a tuning grid
-grid <- list(
-  ntrees = c(1000, 1500),
-  max_depth = c(1, 2, 3, 5, 7, 10),
-  learn_rate = c(.001, .0001),
-  min_split_improvement = c(.0001),
-  distribution = c("gaussian", "huber"),
-  sample_rate = c(.632),
-  nbins_cats = c(56),
-  categorical_encoding = c("Eigen", "LabelEncoder"),
-  col_sample_rate_per_tree = c(.8),
-  seed = 16
-) %>%
-  expand.grid(stringsAsFactors = FALSE)
+# split into training, testing, and validation frames
+ui_info("Splitting data...")
+df_hf <- as.h2o(df) %>%
+  h2o.splitFrame(ratios = c(.7, .1), seed = 16)
+train <- df_hf[[1]]
+validate <- df_hf[[2]]
+test <- df_hf[[3]]
+ui_done("Data split!")
+
+#### Train Models and Record Results ----
 
 # initialize the data frames where we will save the results
 results <- data.frame(stringsAsFactors = FALSE)
 varimp <- data.frame(stringsAsFactors = FALSE)
 
-
 # run the loop across all rows of the training grid
-print("starting for loop....")
+ui_info("Starting for loop....")
 for (i in 1:nrow(grid)) {
   grid_sub <- grid %>% dplyr::slice(i)
   
@@ -102,9 +80,12 @@ for (i in 1:nrow(grid)) {
     usethis::ui_info("Starting model {i}")
     tic(stringr::str_c("model", i, sep = " "))
     tmp_mod <- h2o::h2o.gbm(
-      y = "loss_cost",
-      training_frame = bi_train,
-      validation_frame = bi_test,
+      y = response,
+      # Don't include X_VAR2, X_VAR19, X_VAR34, X_VAR46 in data due to constant
+      # levels or too many levels
+      x = str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
+      training_frame = train,
+      validation_frame = validate,
       nfolds = 5,
       distribution = grid_sub$distribution,
       model_id = "temp_gb_mod",
@@ -121,7 +102,7 @@ for (i in 1:nrow(grid)) {
     )
     time <- toc()
     
-    usethis::ui_info("Model {i} trained")
+    ui_info("Model {i} trained")
     
     results_tmp <- data.frame(
       mod_num = i,
@@ -152,24 +133,17 @@ for (i in 1:nrow(grid)) {
       stringsAsFactors = FALSE
     )
     
-    usethis::ui_info("Model {i} tested")
-    
-    varimp_tmp <- h2o.varimp(tmp_mod) %>% dplyr::mutate(mod_num = i)
+    ui_info("Model {i} metrics calculated")
     
     results <- rbind(results, results_tmp)
-    varimp <- rbind(varimp, varimp_tmp)
-    usethis::ui_done("Model {i} finished and data saved")
+    write_csv(results, str_c(output_loc, data, "_gb_", response, "_tuning_results.csv"))
+    ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
     usethis::ui_oops("Model {i} failed!")
   })
 }
 
-# write the results to CSV files
-print("writing results...")
-readr::write_csv(varimp, stringr::str_c("results_gb_varimp_", Sys.date(), ".csv"))
-readr::write_csv(results, stringr::str_c("results_gb_metrics_", Sys.date(), ".csv"))
-
-
-# terminate R
-q()
+#### Clean Up ----
+h2o.shutdown(prompt = FALSE)
+q(save = "no")
