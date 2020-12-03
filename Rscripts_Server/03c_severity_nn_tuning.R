@@ -1,96 +1,99 @@
+# Tune Neural Network Models to predict Amount per Claim (Severity)
 
+#### User Inputs ----
+
+# 1. Choose the data set that you wish to use, "bi", "pd", or "coll"
+data <- "bi"
+
+# 2. set the relative directory of the data and the output (with forward slash at the end)
+data_loc <- "data/"
+output_loc <- NULL
+
+# 3. Determine whether to predict the severity or the log of the severity
+response <- "severity"
+# response <- "log_severity"
+
+# 4. Create a tuning grid
+grid <- expand.grid(
+  list(
+    activation = c("Tanh"),
+    hidden = list(100, c(100, 100), c(200, 200), c(100, 100, 100)),
+    adaptive_rate = FALSE,
+    rate = c(0.1, 0.01, 0.005, 0.001),
+    rate_decay = c(0.5),
+    momentum_start = c(0.5),
+    momentum_stable = 0.99,
+    input_dropout_ratio = c(0.1),
+    initial_weight_distribution = c("Uniform", "Normal"),
+    initial_weight_scale = c(1, 2),
+    loss = c("Automatic", "Huber"),
+    distribution = c("gaussian", "gamma", "laplace", "huber"),
+    stopping_metric = "MAE",
+    stopping_tolerance = c("0.001"),
+    categorical_encoding = c("EnumLimited"),
+    seed = 16,
+    mini_batch_size = c(10, 100)
+  ),
+  stringsAsFactors = FALSE
+)
+
+#### Setup ----
+
+usethis::ui_info("Loading libraries")
 library(h2o)
-library(dplyr)
 library(tictoc)
+library(usethis)
+library(dplyr)
+library(readr)
+library(data.table)
 
 # start the h2o cluster
 h2o::h2o.init()
 
-# read the data into memory
-bi <- data.table::fread("bi_severity.csv", stringsAsFactors = TRUE) %>%
-  dplyr::mutate(log_sev = log(severity)) %>%
-  dplyr::select(-severity)
-print("Data in!")
+#### Data Loading and Manipulating ----
 
-# select the columns we want from the data
-# and make everything a factor except the response and EARNED_EXPOSURE
-#bi <- bi %>%
-#  dplyr::mutate(
-#    loss_cost = ULTIMATE_AMOUNT / EARNED_EXPOSURE
-#  ) %>%
-#  dplyr::select(
-#    -V1,
-#    -ULTIMATE_AMOUNT,
-#    -ULTIMATE_CLAIM_COUNT,
-#    -EARNED_EXPOSURE,
-#    -CLAIM,
-#    -X_VAR2,
-#    -X_VAR19,
-#    -X_VAR34,
-#    -X_VAR46,
-#    -form
-#  ) %>% 
-#  dplyr::filter(loss_cost > 0) %>%
-#  dplyr::mutate_at(
-#    .vars = stringr::str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
-#    .funs = as.factor
-#  )
+ui_info("Initializing values and reading in the data...")
+
+df <- fread(str_c(data_loc, data, ".csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  mutate(
+    severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT,
+    log_severity = log(severity)
+  )
+
+ui_done("Data in!")
 
 # split into training, testing, and validation frames
-bi_hf <- h2o::as.h2o(bi) %>%
-  h2o::h2o.splitFrame(ratios = c(.7, .1), seed = 16)
-bi_train <- bi_hf[[1]]
-bi_validate <- bi_hf[[2]]
-bi_test <- bi_hf[[3]]
-print("data split!")
+ui_info("Splitting data...")
+df_hf <- as.h2o(df) %>%
+  h2o.splitFrame(ratios = c(.7, .1), seed = 16)
+train <- df_hf[[1]]
+validate <- df_hf[[2]]
+test <- df_hf[[3]]
+ui_done("Data split!")
 
-## create a tuning grid
-grid <- list(
-  activation = c("Tanh"),
-  hidden = list(100, c(100, 100), c(200, 200), c(100, 100, 100)),
-  adaptive_rate = FALSE,
-  rate = c(0.1, 0.01, 0.005, 0.001),
-  rate_decay = c(0.5),
-  momentum_start = c(0.5),
-  momentum_stable = 0.99,
-  input_dropout_ratio = c(0.1),
-  initial_weight_distribution = c("Uniform", "Normal"),
-  initial_weight_scale = c(1, 2),
-  loss = c("Automatic", "Huber"),
-  distribution = c("gaussian", "gamma", "laplace", "huber"),
-  stopping_metric = "MAE",
-  stopping_tolerance = c("0.001"),
-  categorical_encoding = c("EnumLimited"),
-  seed = 16,
-  mini_batch_size = c(10, 100)
-) %>%
-  expand.grid(stringsAsFactors = FALSE)
+#### Train Models and Record Results ----
 
 # initialize the data frames where we will save the results
 results <- data.frame(stringsAsFactors = FALSE)
 varimp <- data.frame(stringsAsFactors = FALSE)
 
-
 # run the loop across all rows of the training grid
-print("starting for loop....")
+ui_info("Starting for loop....")
 for (i in 1:nrow(grid)) {
-  # Sys.sleep(10)
-  # h2o.init()
-  # bi_hf <- h2o::as.h2o(bi) %>%
-  #   h2o.splitFrame(ratios = c(.7, .1), seed = 16)
-  # bi_train <- bi_hf[[1]]
-  # bi_validate <- bi_hf[[2]]
-  # bi_test <- bi_hf[[3]]
   
   grid_sub <- grid %>% dplyr::slice(i)
   
   tryCatch({
-    usethis::ui_info("Starting model {i}")
+    ui_info("Starting model {i}")
     tic(stringr::str_c("model", i, sep = " "))
     tmp_mod <- h2o::h2o.deepLearning(
-      y = "log_sev",
-      training_frame = bi_train,
-      validation_frame = bi_validate,
+      y = response,
+      # Don't include X_VAR2, X_VAR19, X_VAR34, X_VAR46 in data due to constant
+      # levels or too many levels
+      x = str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
+      training_frame = train,
+      validation_frame = validate,
       nfolds = 5,
       model_id = "temp_nn_mod",
       activation = grid_sub$activation,
@@ -113,7 +116,7 @@ for (i in 1:nrow(grid)) {
     )
     time <- toc()
     
-    usethis::ui_info("Model {i} trained")
+    ui_info("Model {i} trained")
     
     results_tmp <- data.frame(
       mod_num = i,
@@ -150,22 +153,17 @@ for (i in 1:nrow(grid)) {
       stringsAsFactors = FALSE
     )
     
-    usethis::ui_info("Model {i} tested")
-    
-    varimp_tmp <- h2o.varimp(tmp_mod) %>% dplyr::mutate(mod_num = i)
+    ui_info("Model {i} metrics calculated")
     
     results <- rbind(results, results_tmp)
-    varimp <- rbind(varimp, varimp_tmp)
-    readr::write_csv(varimp, "nn_tuning_varimp_log.csv")
-    readr::write_csv(results, "nn_tuning_results_log.csv")
-    usethis::ui_done("Model {i} finished and data saved")
+    write_csv(results, str_c(output_loc, data, "_nn_", response, "_tuning_results.csv"))
+    ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
     usethis::ui_oops("Model {i} failed! {e}")
   })
-  print("shutdown h2o")
-  h2o.shutdown(prompt = FALSE)
 }
 
-# terminate R
-q()
+#### Clean Up ----
+h2o.shutdown(prompt = FALSE)
+q(save = "no")
