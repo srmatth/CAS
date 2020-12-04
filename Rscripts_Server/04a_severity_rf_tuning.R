@@ -7,7 +7,7 @@ data <- "bi"
 
 # 2. set the relative directory of the data and the output (with forward slash at the end)
 data_loc <- "data/"
-output_loc <- NULL
+output_loc <- "output/"
 
 # 3. Determine whether to predict the severity or the log of the severity
 response <- "severity"
@@ -17,12 +17,12 @@ response <- "severity"
 grid <- expand.grid(
   list(
     ntrees = c(100, 300, 500, 1000, 3000),
-    max_depth = c(1,3,5, 7, 10, 15, 20, 30),
-    min_split_improvement = c(.01, .001, .0001, .00001),
+    max_depth = c(3, 5, 7, 10, 15, 20, 30),
+    min_split_improvement = c(.01, .001, .0001),
     mtries = c(-1, 7, 20),
-    histogram_type = c("UniformAdaptive", "Random"),
+    histogram_type = c("UniformAdaptive"),
     sample_rate = c(.632),
-    categorical_encoding = c("EnumLimited", "Eigen", "OneHotInternal"),
+    categorical_encoding = c("EnumLimited"),
     col_sample_rate_per_tree = c(.8),
     seed = 16
   ), 
@@ -45,17 +45,20 @@ h2o::h2o.init()
 
 #### Data Loading and Manipulating ----
 
-ui_info("Initializing values and reading in the data...")
+ui_info("Reading in the data...")
 
 train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
   as.h2o()
+ui_done("Train data read in!")
 validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
   as.h2o()
-train <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
-  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+ui_done("Validation data read in!")
+# dont filter test because we want to predict on ALL the test data
+test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
   as.h2o()
+ui_done("Test data read in!")
 
 ui_done("Data in!")
 

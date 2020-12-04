@@ -7,7 +7,7 @@ data <- "bi"
 
 # 2. set the relative directory of the data and the output (with forward slash at the end)
 data_loc <- "data/"
-output_loc <- NULL
+output_loc <- "output/"
 
 # 3. Determine whether to predict the severity or the log of the severity
 response <- "severity"
@@ -53,31 +53,28 @@ h2o::h2o.init()
 
 #### Data Loading and Manipulating ----
 
-ui_info("Initializing values and reading in the data...")
+ui_info("Reading in the data...")
 
-df <- fread(str_c(data_loc, data, ".csv"), stringsAsFactors = TRUE) %>%
+train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
-  mutate(
-    severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT,
-    log_severity = log(severity)
-  )
+  as.h2o()
+ui_done("Train data read in!")
+validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  as.h2o()
+ui_done("Validation data read in!")
+# dont filter test because we want to predict on ALL the test data
+test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
+  as.h2o()
+ui_done("Test data read in!")
 
 ui_done("Data in!")
-
-# split into training, testing, and validation frames
-ui_info("Splitting data...")
-df_hf <- as.h2o(df) %>%
-  h2o.splitFrame(ratios = c(.7, .1), seed = 16)
-train <- df_hf[[1]]
-validate <- df_hf[[2]]
-test <- df_hf[[3]]
-ui_done("Data split!")
 
 #### Train Models and Record Results ----
 
 # initialize the data frames where we will save the results
 results <- data.frame(stringsAsFactors = FALSE)
-varimp <- data.frame(stringsAsFactors = FALSE)
+predictions <- data.frame(stringsAsFactors = FALSE)
 
 # run the loop across all rows of the training grid
 ui_info("Starting for loop....")
@@ -156,8 +153,19 @@ for (i in 1:nrow(grid)) {
     
     ui_info("Model {i} metrics calculated")
     
+    predictions_tmp <- predict(tmp_mod, test) %>%
+      as.data.frame() %>%
+      mutate(
+        mod_num = i,
+        row_num = 1:nrow(.)
+      )
+    
+    ui_info("Model {i} predictions made")
+    
     results <- rbind(results, results_tmp)
+    predictions <- rbind(predictions, predictions_tmp)
     write_csv(results, str_c(output_loc, data, "_nn_", response, "_tuning_results.csv"))
+    fwrite(predictions, str_c(output_loc, data, "_nn_", response, "_predictions.csv"))
     ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
