@@ -46,6 +46,7 @@ library(usethis)
 library(dplyr)
 library(readr)
 library(data.table)
+library(stringr)
 
 # start the h2o cluster
 h2o::h2o.init()

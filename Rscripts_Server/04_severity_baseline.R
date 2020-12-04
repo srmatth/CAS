@@ -7,7 +7,7 @@ data <- "bi"
 
 # 2. set the relative directory of the data and the output (with forward slash at the end)
 data_loc <- "data/"
-output_loc <- NULL
+output_loc <- "output/"
 
 # 3. Determine whether to predict the severity or the log of the severity
 response <- "severity"
@@ -20,31 +20,29 @@ library(h2o)
 library(usethis)
 library(dplyr)
 library(data.table)
+library(stringr)
 
 # start the h2o cluster
 h2o::h2o.init()
 
 #### Data Loading and Manipulating ----
 
-ui_info("Initializing values and reading in the data...")
+ui_info("Reading in the data...")
 
-df <- fread(str_c(data_loc, data, ".csv"), stringsAsFactors = TRUE) %>%
+train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
-  mutate(
-    severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT,
-    log_severity = log(severity)
-  )
+  as.h2o()
+ui_done("Training data read in!")
+validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  as.h2o()
+ui_done("Validation data read in!")
+test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  as.h2o()
+ui_done("Test data read in!")
 
 ui_done("Data in!")
-
-# split into training, testing, and validation frames
-ui_info("Splitting data...")
-df_hf <- as.h2o(df) %>%
-  h2o.splitFrame(ratios = c(.7, .1), seed = 16)
-train <- df_hf[[1]]
-validate <- df_hf[[2]]
-test <- df_hf[[3]]
-ui_done("Data split!")
 
 #### Model Creation ----
 lm <- h2o.glm(
@@ -53,13 +51,13 @@ lm <- h2o.glm(
   # levels or too many levels
   x = str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
   training_frame = train,
-  model_id = str_c(data, "_baseline_mod")
+  model_id = str_c(data, "_", response, "_baseline_mod")
 )
 
 perf <- test %>%
   as.data.frame() %>%
-  cbind(preds = as.data.frame(predict(lm, test))) %>%
-  mutate(residuals = severity - preds)
+  cbind(as.data.frame(predict(lm, test))) %>%
+  mutate(residuals = severity - predict)
 
 # get the MSE on the test dataset
 ui_info("The MSE is: {mean(perf$residuals^2)}")
@@ -71,7 +69,12 @@ ui_info("The RMSE is: {sqrt(mean(perf$residuals^2))}")
 ui_info("The MAE is: {mean(abs(perf$residuals))}")
 
 h2o.saveModel(lm, str_c(output_loc))
-ui_done("Baseline model saved")
+predictions <- predict(lm, test) %>%
+  as.data.frame() %>%
+  mutate(mod_num = 1, row_num = 1:nrow(.))
+fwrite(predictions, str_c(output_loc, data, "_baseline_", response, "_predictions.csv"))
+
+ui_done("Baseline model and data saved")
 
 #### Clean Up ----
 

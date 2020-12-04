@@ -39,6 +39,7 @@ library(usethis)
 library(dplyr)
 library(readr)
 library(data.table)
+library(stringr)
 
 # start the h2o cluster
 h2o::h2o.init()
@@ -69,7 +70,7 @@ ui_done("Data split!")
 
 # initialize the data frames where we will save the results
 results <- data.frame(stringsAsFactors = FALSE)
-varimp <- data.frame(stringsAsFactors = FALSE)
+predictions <- data.frame(stringsAsFactors = FALSE)
 
 # run the loop across all rows of the training grid
 ui_info("Starting for loop....")
@@ -135,8 +136,19 @@ for (i in 1:nrow(grid)) {
     
     ui_info("Model {i} metrics calculated")
     
+    predictions_tmp <- predict(tmp_mod, test) %>%
+      as.data.frame() %>%
+      mutate(
+        mod_num = i,
+        row_num = 1:nrow(.)
+      )
+    
+    ui_info("Model {i} predictions made")
+    
     results <- rbind(results, results_tmp)
+    predictions <- rbind(predictions, predictions_tmp)
     write_csv(results, str_c(output_loc, data, "_gb_", response, "_tuning_results.csv"))
+    fwrite(predictions, str_c(output_loc, data, "_gb_", response, "_predictions.csv"))
     ui_done("Model {i} finished and data saved")
   },
   error = function(e) {

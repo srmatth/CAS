@@ -38,6 +38,7 @@ library(usethis)
 library(dplyr)
 library(readr)
 library(data.table)
+library(stringr)
 
 # start the h2o cluster
 h2o::h2o.init()
@@ -46,29 +47,23 @@ h2o::h2o.init()
 
 ui_info("Initializing values and reading in the data...")
 
-df <- fread(str_c(data_loc, data, ".csv"), stringsAsFactors = TRUE) %>%
+train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
-  mutate(
-    severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT,
-    log_severity = log(severity)
-  )
+  as.h2o()
+validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  as.h2o()
+train <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  as.h2o()
 
 ui_done("Data in!")
-
-# split into training, testing, and validation frames
-ui_info("Splitting data...")
-df_hf <- as.h2o(df) %>%
-  h2o.splitFrame(ratios = c(.7, .1), seed = 16)
-train <- df_hf[[1]]
-validate <- df_hf[[2]]
-test <- df_hf[[3]]
-ui_done("Data split!")
 
 #### Train Models and Record Results ----
 
 # initialize the data frames where we will save the results
 results <- data.frame(stringsAsFactors = FALSE)
-varimp <- data.frame(stringsAsFactors = FALSE)
+predictions <- data.frame(stringsAsFactors = FALSE)
 
 
 # run the loop across all rows of the training grid
@@ -129,8 +124,19 @@ for (i in 1:nrow(grid)) {
     
     ui_info("Model {i} metrics calculated")
     
+    predictions_tmp <- predict(tmp_mod, test) %>%
+      as.data.frame() %>%
+      mutate(
+        mod_num = i,
+        row_num = 1:nrow(.)
+      )
+    
+    ui_info("Model {i} predictions made")
+    
     results <- rbind(results, results_tmp)
+    predictions <- rbind(predictions, predictions_tmp)
     write_csv(results, str_c(output_loc, data, "_rf_", response, "_tuning_results.csv"))
+    fwrite(predictions, str_c(output_loc, data, "_rf_", response, "_predictions.csv"))
     ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
