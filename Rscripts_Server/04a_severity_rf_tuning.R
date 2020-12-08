@@ -16,7 +16,7 @@ response <- "severity"
 # 4. Create a tuning grid
 grid <- expand.grid(
   list(
-    ntrees = c(100, 300, 500, 1000, 3000),
+    ntrees = c(100, 300, 500),
     max_depth = c(3, 5, 7, 10, 15, 20, 30),
     min_split_improvement = c(.01, .001, .0001),
     mtries = c(-1, 7, 20),
