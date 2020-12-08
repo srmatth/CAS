@@ -53,7 +53,7 @@ for (i in data) {
     y = response,
     # Don't include X_VAR2, X_VAR19, X_VAR34, X_VAR46 in data due to constant
     # levels or too many levels
-    x = str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
+    x = c("EARNED_EXPOSURE", str_c("X_VAR", c(1, 3:18, 20:33, 35:45))),
     training_frame = train,
     model_id = str_c(i, "_baseline_", tolower(response), "_mod"),
     family = "multinomial"
