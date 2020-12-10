@@ -46,15 +46,15 @@ h2o::h2o.init()
 
 ui_info("Reading in the data...")
 
-train <- fread(str_c(data_loc, i, "_train.csv"), stringsAsFactors = TRUE) %>%
+train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
   mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
   as.h2o()
 ui_done("Training data read in!")
-validate <- fread(str_c(data_loc, i, "_validate.csv"), stringsAsFactors = TRUE) %>%
+validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
   mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
   as.h2o()
 ui_done("Validation data read in!")
-test <- fread(str_c(data_loc, i, "_test.csv"), stringsAsFactors = TRUE) %>%
+test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
   mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
   as.h2o()
 ui_done("Test data read in!")
@@ -96,9 +96,9 @@ for (i in 1:nrow(grid)) {
     )
     time <- toc()
     
-    usethis::ui_info("Model {i} trained")
+    ui_info("Model {i} trained")
     
-    perf <- h2o.performance(tmp_mod, bi_test_h)
+    perf <- h2o.performance(tmp_mod, test)
     
     results_tmp <- data.frame(
       mod_num = i,
@@ -136,8 +136,8 @@ for (i in 1:nrow(grid)) {
     
     results <- rbind(results, results_tmp)
     predictions <- rbind(predictions, predictions_tmp)
-    write_csv(results, str_c(output_loc, data, "_rf_", response, "_tuning_results.csv"))
-    fwrite(predictions, str_c(output_loc, data, "_rf_", response, "_predictions.csv"))
+    write_csv(results, str_c(output_loc, data, "_rf_", tolower(response), "_tuning_results.csv"))
+    fwrite(predictions, str_c(output_loc, data, "_rf_", tolower(response), "_predictions.csv"))
     usethis::ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
