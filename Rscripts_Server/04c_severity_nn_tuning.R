@@ -85,7 +85,7 @@ for (i in 1:nrow(grid)) {
   tryCatch({
     ui_info("Starting model {i}")
     tic(stringr::str_c("model", i, sep = " "))
-    tmp_mod <- h2o::h2o.deepLearning(
+    tmp_mod <- h2o::h2o.deeplearning(
       y = response,
       # Don't include X_VAR2, X_VAR19, X_VAR34, X_VAR46 in data due to constant
       # levels or too many levels
@@ -95,7 +95,7 @@ for (i in 1:nrow(grid)) {
       nfolds = 5,
       model_id = "temp_nn_mod",
       activation = grid_sub$activation,
-      hidden = grid_sub$hidden,
+      hidden = grid_sub$hidden[[1]],
       adaptive_rate = grid_sub$adaptive_rate,
       rate = grid_sub$rate,
       rate_decay = grid_sub$rate_decay,
@@ -121,8 +121,8 @@ for (i in 1:nrow(grid)) {
       time_to_create = time$toc - time$tic,
       nfolds = 5,
       activation = grid_sub$activation,
-      total_nodes = sum(grid_sub$hidden),
-      num_layers = length(grid_sub$hidden),
+      total_nodes = sum(grid_sub$hidden[[1]]),
+      num_layers = length(grid_sub$hidden[[1]]),
       adaptive_rate = grid_sub$adaptive_rate,
       rate = grid_sub$rate,
       rate_decay = grid_sub$rate_decay,
