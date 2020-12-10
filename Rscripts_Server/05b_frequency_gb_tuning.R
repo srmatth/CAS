@@ -9,7 +9,7 @@ data <- "bi"
 data_loc <- "data/"
 output_loc <- "output/"
 
-# 3. Determine whether to predict the severity or the log of the severity
+# 3. Determine the Response (This shouldn't change)
 response <- "ULTIMATE_CLAIM_COUNT"
 
 # 4. Create a tuning grid
