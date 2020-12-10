@@ -49,6 +49,7 @@ ui_info("Reading in the data...")
 
 train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  distinct() %>%
   as.h2o()
 ui_done("Train data read in!")
 validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
