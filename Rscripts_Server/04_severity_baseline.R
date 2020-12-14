@@ -57,6 +57,8 @@ for (i in data) {
     # levels or too many levels
     x = str_c("X_VAR", c(1, 3:18, 20:33,35:45)),
     training_frame = train,
+    validation_frame = validate,
+    nfolds = 5,
     model_id = str_c(i, "_baseline_", response, "_mod")
   )
   
@@ -68,13 +70,13 @@ for (i in data) {
     mutate(residuals = !!rlang::sym(response) - predict)
   
   # get the MSE on the test dataset
-  ui_info("The MSE is: {mean(perf$residuals^2, na.rm = TRUE)}")
+  ui_info("The validation MSE is: {h2o.mse(lm, valid = TRUE)}")
   
   # get the RMSE on the test dataset
-  ui_info("The RMSE is: {sqrt(mean(perf$residuals^2, na.rm = TRUE))}")
+  ui_info("The validation RMSE is: {h2o.rmse(lm, valid = TRUE)}")
   
   # get the MAE on the test dataset
-  ui_info("The MAE is: {mean(abs(perf$residuals), na.rm = TRUE)}")
+  ui_info("The validation MAE is: {h2o.mae(lm, valid = TRUE)}")
   
   h2o.saveModel(lm, str_c(output_loc), force = TRUE)
   predictions <- perf %>%

@@ -123,6 +123,8 @@ for (i in 1:nrow(grid)) {
       stringsAsFactors = FALSE
     )
     
+    rm(perf)
+    
     ui_info("Model {i} metrics calculated")
     
     predictions_tmp <- predict(tmp_mod, test) %>%
