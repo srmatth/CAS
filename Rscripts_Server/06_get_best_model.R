@@ -6,10 +6,15 @@
 data <- "bi"
 
 # 2. set the relative directory of the data and the output (with forward slash at the end)
-# Note that in this case, the output_loc is also input_loc (it is the same file that was the output
+# Note that in this case, the pred_loc is the same file that was the output
 # directory in the tuning files)
 data_loc <- "data/"
+pred_loc <- "output/"
 output_loc <- "output/"
+
+# 3. Choose the metric for evaluating the "best" model
+metric <- "mse"
+# metric <- "mae"
 
 #### Setup ----
 
@@ -18,14 +23,15 @@ library(dplyr)
 library(stringr)
 library(fs)
 library(data.table)
+library(rlang)
 
 ui_info("Determining which files to read in...")
-severity_pred_files <- dir_ls(output_loc) %>%
+severity_pred_files <- dir_ls(pred_loc) %>%
   str_subset(str_c(data, ".*severity_predictions.csv")) %>%
   str_subset("log", negate = TRUE)
-log_severity_pred_files <- dir_ls(output_loc) %>%
+log_severity_pred_files <- dir_ls(pred_loc) %>%
   str_subset(str_c(data, ".*log_severity_predictions.csv"))
-frequency_pred_files <- dir_ls(output_loc) %>%
+frequency_pred_files <- dir_ls(pred_loc) %>%
   str_subset(str_c(data, ".*frequency_predictions.csv"))
 
 #### Read in the Data ----
@@ -114,6 +120,22 @@ for (i in 1:nrow(severity_mods)) {
     )
     
     results <- rbind(results, results_tmp)
+    
+    fwrite(results, str_c(output_loc, data, "model_comparison.csv"))
   }
 }
+
+#### Pull out the "Best" Models ----
+
+best_models <- results %>%
+  arrange(!!sym(metric)) %>%
+  slice(1)
+
+best_sev_mod <- fread(str_replace(best_models$sev_mod_file, "predictions", "tuning_results")) %>%
+  filter(mod_num == best_models$sev_mod_num) %>%
+  slice(1)
+
+best_freq_mod <- fread(str_replace(best_models$freq_mod_file, "predictions", "tuning_results")) %>%
+  filter(mod_num == best_models$freq_mod_num) %>%
+  slice(1)
 
