@@ -41,7 +41,7 @@ library(data.table)
 library(stringr)
 
 # start the h2o cluster
-h2o::h2o.init()
+h2o::h2o.init(max_mem_size = "50G")
 
 #### Data Loading and Manipulating ----
 
@@ -144,9 +144,10 @@ for (i in 1:nrow(grid)) {
     write_csv(results, str_c(output_loc, data, "_gb_", tolower(response), "_tuning_results.csv"))
     fwrite(predictions, str_c(output_loc, data, "_gb_", tolower(response), "_predictions.csv"))
     ui_done("Model {i} finished and data saved")
+    h2o.rm(tmp_mod)
   },
   error = function(e) {
-    usethis::ui_oops("Model {i} failed!")
+    usethis::ui_oops("Model {i} failed! {e}")
   })
 }
 

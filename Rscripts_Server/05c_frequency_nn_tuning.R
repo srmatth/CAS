@@ -48,7 +48,7 @@ library(data.table)
 library(stringr)
 
 # start the h2o cluster
-h2o::h2o.init()
+h2o::h2o.init(max_mem_size = "50G")
 
 #### Data Loading and Manipulating ----
 
