@@ -1,4 +1,4 @@
-# Get the Best Overall Model for the Data
+# Get Metrics for all Possible Model Combinations
 
 #### User Inputs ----
 
@@ -12,10 +12,6 @@ data_loc <- "data/"
 pred_loc <- "output/"
 output_loc <- "output/"
 
-# 3. Choose the metric for evaluating the "best" model
-metric <- "mse"
-# metric <- "mae"
-
 #### Setup ----
 
 usethis::ui_info("Loading Libraries")
@@ -23,7 +19,7 @@ library(dplyr)
 library(stringr)
 library(fs)
 library(data.table)
-library(rlang)
+library(usethis)
 
 ui_info("Determining which files to read in...")
 severity_pred_files <- dir_ls(pred_loc) %>%
@@ -32,12 +28,12 @@ severity_pred_files <- dir_ls(pred_loc) %>%
 log_severity_pred_files <- dir_ls(pred_loc) %>%
   str_subset(str_c(data, ".*log_severity_predictions.csv"))
 frequency_pred_files <- dir_ls(pred_loc) %>%
-  str_subset(str_c(data, ".*frequency_predictions.csv"))
+  str_subset(str_c(data, ".*ultimate_claim_count_predictions.csv"))
 
 #### Read in the Data ----
 
 ui_info("Reading in the data!")
-test <- fread(str_c(data_loc, i, "_test.csv"), stringsAsFactors = TRUE)
+test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE)
 severity_preds <- purrr::map_dfr(
   .x = severity_pred_files,
   .f = ~{
@@ -71,6 +67,7 @@ frequency_preds <- purrr::map_dfr(
 
 #### Figure out all combinations ----
 
+ui_info("Getting all possible model combinations...")
 severity_mods <- severity_preds %>%
   select(file, mod_num) %>%
   distinct()
@@ -84,6 +81,7 @@ results <- data.frame()
 for (i in 1:nrow(severity_mods)) {
   sev_mod <- severity_mods %>%
     slice(i)
+  ui_info("Computing metrics for model {sev_mod$mod_num} from file {sev_mod$file} with all freq models")
   sev_mod_preds <- severity_preds %>%
     filter(
       file == sev_mod$file,
@@ -121,21 +119,10 @@ for (i in 1:nrow(severity_mods)) {
     
     results <- rbind(results, results_tmp)
     
-    fwrite(results, str_c(output_loc, data, "model_comparison.csv"))
+    fwrite(results, str_c(output_loc, data, "_model_comparison.csv"))
   }
 }
 
-#### Pull out the "Best" Models ----
-
-best_models <- results %>%
-  arrange(!!sym(metric)) %>%
-  slice(1)
-
-best_sev_mod <- fread(str_replace(best_models$sev_mod_file, "predictions", "tuning_results")) %>%
-  filter(mod_num == best_models$sev_mod_num) %>%
-  slice(1)
-
-best_freq_mod <- fread(str_replace(best_models$freq_mod_file, "predictions", "tuning_results")) %>%
-  filter(mod_num == best_models$freq_mod_num) %>%
-  slice(1)
+#### Clean Up ----
+q(save = "no")
 
