@@ -73,9 +73,9 @@ if (str_detect(best_models$sev_mod_file, "baseline")) {
     training_frame = train,
     validation_frame = validate,
     nfolds = 5,
-    model_id = str_c(data, "_best_", sev_response, "_mod")
+    model_id = str_c(data, "_best_severity_mod")
   )
-  h2o.saveModel(best_sev, output_loc)
+  h2o.saveModel(best_sev, output_loc, force = TRUE)
   
 } else if (str_detect(best_models$sev_mod_file, "rf")) {
   
@@ -85,7 +85,7 @@ if (str_detect(best_models$sev_mod_file, "baseline")) {
     training_frame = train,
     validation_frame = validate,
     nfolds = 5,
-    model_id = str_c(data, "_best_", sev_response, "_mod"),
+    model_id = str_c(data, "_best_severity_mod"),
     ntrees = best_sev_mod$ntrees,
     max_depth = best_sev_mod$max_depth,
     mtries = best_sev_mod$mtries,
@@ -96,7 +96,7 @@ if (str_detect(best_models$sev_mod_file, "baseline")) {
     seed = best_sev_mod$seed,
     col_sample_rate_per_tree = best_sev_mod$col_sample_rate_per_tree
   )
-  h2o.saveModel(best_sev, output_loc)
+  h2o.saveModel(best_sev, output_loc, force = TRUE)
   
 } else if (str_detect(best_models$sev_mod_file, "gb")) {
   
@@ -107,7 +107,7 @@ if (str_detect(best_models$sev_mod_file, "baseline")) {
     validation_frame = validate,
     nfolds = 5,
     distribution = best_sev_mod$distribution,
-    model_id = str_c(data, "_best_", sev_response, "_mod"),
+    model_id = str_c(data, "_best_severity_mod"),
     ntrees = best_sev_mod$ntrees,
     max_depth = best_sev_mod$max_depth,
     learn_rate = best_sev_mod$learn_rate,
@@ -118,7 +118,7 @@ if (str_detect(best_models$sev_mod_file, "baseline")) {
     seed = best_sev_mod$seed,
     col_sample_rate_per_tree = best_sev_mod$col_sample_rate_per_tree
   )
-  h2o.saveModel(best_sev, output_loc)
+  h2o.saveModel(best_sev, output_loc, force = TRUE)
   
 } else if (str_detect(best_models$sev_mod_file, "nn")) {
   
@@ -128,7 +128,7 @@ if (str_detect(best_models$sev_mod_file, "baseline")) {
     training_frame = train,
     validation_frame = validate,
     nfolds = 5,
-    model_id = str_c(data, "_best_", sev_response, "_mod"),
+    model_id = str_c(data, "_best_severity_mod"),
     activation = best_sev_mod$activation,
     hidden = best_sev_mod$hidden[[1]],
     adaptive_rate = best_sev_mod$adaptive_rate,
@@ -147,7 +147,7 @@ if (str_detect(best_models$sev_mod_file, "baseline")) {
     seed = best_sev_mod$seed,
     mini_batch_size = best_sev_mod$mini_batch_size
   )
-  h2o.saveModel(best_sev, output_loc)
+  h2o.saveModel(best_sev, output_loc, force = TRUE)
   
 }
 h2o.rm(train)
@@ -175,10 +175,10 @@ if (str_detect(best_models$freq_mod_file, "baseline")) {
     training_frame = train,
     validation_frame = validate,
     nfolds = 5,
-    model_id = str_c(data, "_best_", tolower(freq_response), "_mod"),
+    model_id = str_c(data, "_best_frequency_mod"),
     family = "multinomial"
   )
-  h2o.saveModel(best_freq, output_loc)
+  h2o.saveModel(best_freq, output_loc, force = TRUE)
   
 } else if (str_detect(best_models$freq_mod_file, "rf")) {
   
@@ -188,7 +188,7 @@ if (str_detect(best_models$freq_mod_file, "baseline")) {
     training_frame = train,
     validation_frame = validate,
     nfolds = 5,
-    model_id = str_c(data, "_best_", tolower(freq_response), "_mod"),
+    model_id = str_c(data, "_best_frequency_mod"),
     ntrees = best_freq_mod$ntrees,
     max_depth = best_freq_mod$max_depth,
     mtries = best_freq_mod$mtries,
@@ -199,7 +199,7 @@ if (str_detect(best_models$freq_mod_file, "baseline")) {
     seed = best_freq_mod$seed,
     col_sample_rate_per_tree = best_freq_mod$col_sample_rate_per_tree
   )
-  h2o.saveModel(best_freq, output_loc)
+  h2o.saveModel(best_freq, output_loc, force = TRUE)
   
 } else if (str_detect(best_models$freq_mod_file, "gb")) {
   
@@ -210,7 +210,7 @@ if (str_detect(best_models$freq_mod_file, "baseline")) {
     validation_frame = validate,
     nfolds = 5,
     distribution = best_freq_mod$distribution,
-    model_id = str_c(data, "_best_", tolower(freq_response), "_mod"),
+    model_id = str_c(data, "_best_frequency_mod"),
     ntrees = best_freq_mod$ntrees,
     max_depth = best_freq_mod$max_depth,
     learn_rate = best_freq_mod$learn_rate,
@@ -221,7 +221,7 @@ if (str_detect(best_models$freq_mod_file, "baseline")) {
     seed = best_freq_mod$seed,
     col_sample_rate_per_tree = best_freq_mod$col_sample_rate_per_tree
   )
-  h2o.saveModel(best_freq, output_loc)
+  h2o.saveModel(best_freq, output_loc, force = TRUE)
   
 } else if (str_detect(best_models$freq_mod_file, "nn")) {
   
@@ -231,7 +231,7 @@ if (str_detect(best_models$freq_mod_file, "baseline")) {
     training_frame = train,
     validation_frame = validate,
     nfolds = 5,
-    model_id = str_c(data, "_best_", tolower(freq_response), "_mod"),
+    model_id = str_c(data, "_best_frequency_mod"),
     activation = best_freq_mod$activation,
     hidden = best_freq_mod$hidden[[1]],
     adaptive_rate = best_freq_mod$adaptive_rate,
@@ -250,7 +250,7 @@ if (str_detect(best_models$freq_mod_file, "baseline")) {
     seed = best_freq_mod$seed,
     mini_batch_size = best_freq_mod$mini_batch_size
   )
-  h2o.saveModel(best_freq, output_loc)
+  h2o.saveModel(best_freq, output_loc, force = TRUE)
   
 }
 

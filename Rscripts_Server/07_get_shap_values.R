@@ -1,48 +1,64 @@
-# Compute the SHAP values for all rows of my test data set, based on the model
+# Compute the SHAP values for all rows of the Test Data Set
 
-library(h2o)
+# please note that this requires the model to be a random forest or gradient boosted currently
+# also still not sure if this will work for the multinomial model...
+
+#### User Inputs ----
+
+# 1. Choose the data set that you wish to use, "bi", "pd", or "coll"
+data <- "bi"
+
+# 2. set the relative directory of the data and the output (with forward slash at the end)
+# Note that in this case, the output_loc should be the same as in 06_get_best_model.R
+data_loc <- "data/"
+output_loc <- "output/"
+
+#### Setup ----
+
+usethis::ui_info("Loading libraries")
 library(dplyr)
-library(tictoc)
+library(h2o)
+library(stringr)
+library(usethis)
+library(data.table)
 
-h2o::h2o.init(enable_assertions = FALSE)
+ui_info("Starting H2O cluster...")
+h2o::h2o.init(enable_assertions = FALSE, max_mem_size = "50G")
 
-bi_hf <- data.table::fread("bi_severity.csv") %>%
-  mutate(
-    X_VAR10 = as.factor(X_VAR10),
-    X_VAR13 = as.factor(X_VAR13),
-    X_VAR23 = as.factor(X_VAR23),
-    X_VAR18 = as.factor(X_VAR18),
-    X_VAR27 = as.factor(X_VAR27),
-    X_VAR38 = as.factor(X_VAR38)
-  ) %>%
-  h2o::as.h2o() %>%
-  h2o::h2o.splitFrame(ratios = c(.7, .1), seed = 16)
+ui_info("Reading in test data...")
+test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
+  mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
+  as.h2o()
+ui_done("Test data read in!")
 
-print("Data in!")
+#### Get SHAP Values for Severity ----
 
-bi_train <- bi_hf[[1]]
-bi_validate <- bi_hf[[2]]
-bi_test <- bi_hf[[3]]
+ui_info("Loading best Severity Model for {data} data.")
+sev_mod <- h2o.loadModel(str_c(output_loc, data, "_best_severity_mod"))
 
-print("data split!")
-
-mod <- h2o.loadModel("gb_mod")
-
-print("Getting Predictions")
-preds <- h2o.predict(mod, bi_test) %>%
+ui_info("Getting Severity SHAP values for {data} data...")
+shap <- h2o.predict_contributions(sev_mod, test) %>%
   as.data.frame()
 
-print("Writing Predictions!")
-data.table::fwrite(preds, "gb_preds.csv")
+ui_info("Writing Severity SHAP values for {data} data...")
+fwrite(shap, str_c(output_loc, data, "_severity_shap.csv"))
 
-print("Getting SHAP values!")
-shap <- h2o.predict_contributions(mod, bi_test) %>%
+ui_done("Severity Shap Values computed and saved for {data} test data frame!")
+
+#### Get SHAP Values for Frequency ----
+
+ui_info("Loading best Frequency Model for {data} data.")
+freq_mod <- h2o.loadModel(str_c(output_loc, data, "_best_frequency_mod"))
+
+ui_info("Getting Frequency SHAP values for {data} data...")
+shap <- h2o.predict_contributions(freq_mod, test) %>%
   as.data.frame()
 
-print("Writing SHAP values!")
-data.table::fwrite(shap, "gb_shap.csv")
+ui_info("Writing Frequency SHAP values for {data} data...")
+fwrite(shap, str_c(output_loc, data, "_severity_shap.csv"))
 
-print("Writing Test .csv")
-data.table::fwrite(bi_test %>% as.data.frame(), "bi_severity_test.csv")
+ui_done("Frequency Shap Values computed and saved for {data} test data frame!")
 
-q()
+#### Clean Up ----
+h2o.shutdown(prompt = FALSE)
+q(save = "no")
