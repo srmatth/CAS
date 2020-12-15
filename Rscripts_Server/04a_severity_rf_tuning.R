@@ -16,16 +16,16 @@ response <- "severity"
 # 4. Create a tuning grid
 grid <- expand.grid(
   list(
-    ntrees = c(100, 300, 500),
+    ntrees = c(100, 200),
     max_depth = c(3, 5, 7, 10, 15, 20, 30),
     min_split_improvement = c(.01, .001, .0001),
     mtries = c(-1, 7, 20),
-    histogram_type = c("UniformAdaptive"),
+    histogram_type = c("UniformAdaptive", "RoundRobin"),
     sample_rate = c(.632),
-    categorical_encoding = c("EnumLimited"),
+    categorical_encoding = c("EnumLimited", "Eigen"),
     col_sample_rate_per_tree = c(.8),
     seed = 16
-  ), 
+  ),
   stringsAsFactors = FALSE
 )
 
@@ -85,7 +85,7 @@ for (i in 1:nrow(grid)) {
       training_frame = train,
       validation_frame = validate,
       nfolds = 5,
-      model_id = "temp_gb_mod",
+      model_id = "temp_rf_mod",
       ntrees = grid_sub$ntrees,
       max_depth = grid_sub$max_depth,
       mtries = grid_sub$mtries,
