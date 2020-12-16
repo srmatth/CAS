@@ -20,13 +20,13 @@ save_freq <- 25
 grid <- expand.grid(
   list(
     ntrees = c(300, 500, 1000),
-    max_depth = c(1, 2, 3, 5, 7, 10),
+    max_depth = c(1, 2, 3, 5, 7, 10, 15),
     learn_rate = c(.001, .0001),
     min_split_improvement = c(.0001),
-    distribution = c("gaussian"),
+    distribution = c("gaussian", "laplace", "huber"),
     sample_rate = c(.632),
     nbins_cats = c(56),
-    categorical_encoding = c("Eigen", "LabelEncoder"),
+    categorical_encoding = c("Eigen"),
     col_sample_rate_per_tree = c(.8),
     seed = 16
   ),
@@ -45,7 +45,7 @@ library(data.table)
 library(stringr)
 
 # start the h2o cluster
-h2o::h2o.init()
+h2o::h2o.init(max_mem_size = "50G")
 
 #### Data Loading and Manipulating ----
 

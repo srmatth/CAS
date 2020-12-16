@@ -27,9 +27,9 @@ grid <- expand.grid(
     momentum_start = c(0.5),
     momentum_stable = 0.99,
     input_dropout_ratio = c(0.1),
-    initial_weight_distribution = c("Uniform", "Normal"),
-    initial_weight_scale = c(1, 2),
-    loss = c("Automatic", "Huber"),
+    initial_weight_distribution = c("Normal"),
+    initial_weight_scale = c(1),
+    loss = c("Automatic"),
     distribution = c("gaussian", "gamma", "laplace", "huber"),
     stopping_metric = "MAE",
     stopping_tolerance = c("0.001"),
@@ -52,7 +52,7 @@ library(data.table)
 library(stringr)
 
 # start the h2o cluster
-h2o::h2o.init()
+h2o::h2o.init(max_mem_size = "50G")
 
 #### Data Loading and Manipulating ----
 
