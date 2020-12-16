@@ -13,7 +13,10 @@ output_loc <- "output/"
 response <- "severity"
 # response <- "log_severity"
 
-# 4. Create a tuning grid
+# 4. Determine a frequency to save the predictions (ie. every "save_freq"th model the predictions get saved)
+save_freq <- 25
+
+# 5. Create a tuning grid
 grid <- expand.grid(
   list(
     ntrees = c(300, 500, 1000),
@@ -141,10 +144,15 @@ for (i in 1:nrow(grid)) {
     
     ui_info("Model {i} predictions made")
     
+    h2o.rm(tmp_mod)
+    
     results <- rbind(results, results_tmp)
     predictions <- rbind(predictions, predictions_tmp)
     write_csv(results, str_c(output_loc, data, "_gb_", response, "_tuning_results.csv"))
-    fwrite(predictions, str_c(output_loc, data, "_gb_", response, "_predictions.csv"))
+    # only write the predictions data frame once every so often, as it takes a long time
+    if (i %% save_freq == 0 | i == nrow(grid)) {
+      fwrite(predictions, str_c(output_loc, data, "_gb_", response, "_predictions.csv"))
+    }
     ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
