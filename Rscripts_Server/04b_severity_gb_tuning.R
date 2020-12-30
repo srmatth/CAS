@@ -20,7 +20,7 @@ save_freq <- 25
 grid <- expand.grid(
   list(
     ntrees = c(300, 500, 1000),
-    max_depth = c(1, 2, 3, 5, 7, 10, 15),
+    max_depth = c(1, 2, 3, 5, 7, 10),
     learn_rate = c(.001, .0001),
     min_split_improvement = c(.0001),
     distribution = c("gaussian", "laplace", "huber"),
@@ -51,17 +51,20 @@ h2o::h2o.init(max_mem_size = "50G")
 
 ui_info("Reading in the data...")
 
-train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
+train_mem <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
-  distinct() %>%
+  distinct() 
+train <- train_mem %>%
   as.h2o()
 ui_done("Train data read in!")
-validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
-  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+validate_mem <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) 
+validate <- validate_mem %>%
   as.h2o()
 ui_done("Validation data read in!")
 # dont filter test because we want to predict on ALL the test data
-test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
+test_mem <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) 
+test <- test_mem %>%
   as.h2o()
 ui_done("Test data read in!")
 
@@ -77,6 +80,26 @@ predictions <- data.frame(stringsAsFactors = FALSE)
 ui_info("Starting for loop....")
 for (i in 1:nrow(grid)) {
   grid_sub <- grid %>% dplyr::slice(i)
+  
+  if (grid_sub$distribution %in% c("huber", "laplace")) {
+    ui_info("Sys.sleep to appropraitely shut down and reboot H2O...")
+    h2o.shutdown(prompt = FALSE)
+    Sys.sleep(5)
+    
+    h2o::h2o.init(max_mem_size = "50G")
+    
+    ui_info("Copying the data back to H2O...")
+    
+    train <- train_mem %>%
+      as.h2o()
+    ui_done("Train data copied!")
+    validate <- validate_mem %>%
+      as.h2o()
+    ui_done("Validation data copied!")
+    test <- test_mem %>%
+      as.h2o()
+    ui_done("Test data copied!")
+  }
   
   tryCatch({
     usethis::ui_info("Starting model {i}")

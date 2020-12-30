@@ -22,7 +22,7 @@ grid <- expand.grid(
     activation = c("Tanh"),
     hidden = list(100, c(100, 100), c(200, 200), c(100, 100, 100)),
     adaptive_rate = FALSE,
-    rate = c(0.1, 0.01, 0.005, 0.001),
+    rate = c(0.001, 0.0005, 0.0001),
     rate_decay = c(0.5),
     momentum_start = c(0.5),
     momentum_stable = 0.99,
@@ -30,12 +30,12 @@ grid <- expand.grid(
     initial_weight_distribution = c("Normal"),
     initial_weight_scale = c(1),
     loss = c("Automatic"),
-    distribution = c("gaussian", "gamma", "laplace", "huber"),
+    distribution = c("gaussian", "gamma", "laplace"),
     stopping_metric = "MAE",
-    stopping_tolerance = c("0.001"),
+    stopping_tolerance = c(0.001),
     categorical_encoding = c("EnumLimited"),
     seed = 16,
-    mini_batch_size = c(10, 100)
+    mini_batch_size = c(50)
   ),
   stringsAsFactors = FALSE
 )
@@ -52,7 +52,7 @@ library(data.table)
 library(stringr)
 
 # start the h2o cluster
-h2o::h2o.init(max_mem_size = "50G")
+h2o::h2o.init(max_mem_size = "50G", enable_assertions = FALSE)
 
 #### Data Loading and Manipulating ----
 
