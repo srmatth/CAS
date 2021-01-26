@@ -12,6 +12,9 @@ output_loc <- "output/"
 # 3. Determine the Response (This shouldn't change)
 response <- "ULTIMATE_CLAIM_COUNT"
 
+# 4. Determine a frequency to save the predictions (ie. every "save_freq"th model the predictions get saved)
+save_freq <- 25
+
 # 4. Create a tuning grid
 grid <- expand.grid(
   list(
@@ -139,7 +142,9 @@ for (i in 1:nrow(grid)) {
     results <- rbind(results, results_tmp)
     predictions <- rbind(predictions, predictions_tmp)
     write_csv(results, str_c(output_loc, data, "_rf_", tolower(response), "_tuning_results.csv"))
-    fwrite(predictions, str_c(output_loc, data, "_rf_", tolower(response), "_predictions.csv"))
+    if (i %% save_freq == 0 | i == nrow(grid)) {
+      fwrite(predictions, str_c(output_loc, data, "_rf_", tolower(response), "_predictions.csv"))
+    }
     usethis::ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
