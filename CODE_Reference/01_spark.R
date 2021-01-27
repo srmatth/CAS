@@ -61,4 +61,4 @@ df_sub <- df_s %>%
 
 #### Close Cluster ----
 
-spark_disconnect()
+spark_disconnect(sc)

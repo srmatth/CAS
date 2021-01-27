@@ -28,3 +28,5 @@ vignettes/*.pdf
 .Renviron
 .DS_Store
 README.html
+# the deprecated folder
+deprecated/
