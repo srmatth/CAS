@@ -1,0 +1,140 @@
+---
+title: "Using Spark with R"
+author: "Spencer Matthews"
+date: "1/26/2021"
+output:
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+# Introduction
+
+This brief document is designed to provide a quick start guide for the spark framework that is used in this repository.
+For those not familiar with Spark, it is a distributed computing framework that allows for manipulation and summarization of large datasets that will not fit into memory in R.
+Although this document is not comprehensive, it covers all of the use cases included in the repo.
+For additional details and functionality, see a more complete tutorial at [Rstudio's Blog](https://blog.rstudio.com/2016/09/27/sparklyr-r-interface-for-apache-spark/).
+
+# Getting Started
+
+## Installing Sparklyr and Spark
+
+Although the Spark software can be downloaded directly onto your machine, I find it easiest to simply install the `sparklyr` package and use the built in function, `spark_install()`.
+
+Be sure to specify a version, the latest are 3.0.1 and 2.4.7 (as of January, 2021).
+Some functionalities in related packages require certain versions, as does connecting to H2O.
+
+```{r}
+install.packages("sparklyr")
+library(sparklyr)
+spark_install(version = "2.4.5")
+```
+
+
+## Starting a Spark Cluster
+
+To start a Spark cluster is fairly straightforward, but there are also lots of options that can be set.
+These options should be created as a list, where the name of the item in the list corresponds to the name of the option.
+A few of the options I regularly set are:
+
+* `sparklyr.cores.local` - sets the number of cores to work on in parallel
+* `sparklyr.shell.driver-memory` - sets the memory allocated to the spark cluster
+* `spark.memory.fraction` - sets the fraction of the allocated memory that the cluster is allowed to use
+
+To see a comprehensive list of all the options, go to [this website](https://spark.rstudio.com/deployment/#configuration).
+
+```{r}
+# initialize a list to store spark options in
+conf <- list()
+
+# Set the number of cores
+conf$`sparklyr.cores.local` <- 4
+
+# Set the memory for the cluster 
+conf$`sparklyr.shell.driver-memory` <- "4G"
+# Set the fraction of available memory that the clsuter can use
+conf$spark.memory.fraction <- 0.9
+```
+
+Once the options are set how you would like them, simply use the `spark_connect()` command to start the cluster.
+
+```{r}
+sc <- spark_connect(master = "local", version = "2.4.5", config = conf)
+```
+
+
+# Using the Spark Cluster
+
+Once the connection is made to the spark cluster, you are able to perform many types of distributed operations with it.
+Only a few will be covered in the following sections.
+
+## Adding Data to the Spark Cluster
+
+### Read in Data Directly Using `spark_read_csv()`
+
+Data can be read in directly from a .csv file (or any type or regularly delimited flat file, using the `delimiter` argument).
+I find this to be the most useful way of reading in data, as generally large data files will be stored in some sort of .csv or .txt format, as the CAS data is.
+Note that a name must be specified for identification in the spark cluster.
+
+```{r}
+df_s <- spark_read_csv(sc = sc, name = "df_s", path = "path_to_file.csv")
+```
+
+### Copy Data in the Environment into the Spark Cluster
+
+In the event that a data frame currently in your R environment needs to be copied to the spark cluster, that can be done as well.
+Using the `copy_to()` function, any data in memory gets copied to the spark cluster.
+Generally, I find that `spark_read_csv()` is faster than `copy_to()` so when given the choice I use the former.
+
+```{r}
+df <- iris
+df_s <- copy_to(sc, df, name = "df_s") # 5.079
+```
+
+
+## Dplyr Data Manipulation in the Spark Cluster
+
+Data manipulation can proceed in the same way that it does when doing a tidyverse-based analysis of data.
+Note that not all functions in `dplyr` are supported, and `tidyr` functions such as `pivot_wider()` and `picot_longer()` are also not supported.
+At the end of any dplyr chain, data can be collected using the `dplyr::collect()` function.
+This will bring the results back in to R, so make sure they are not too big for your memory to handle!
+
+```{r}
+library(dplyr)
+df_sum <- df_s %>%
+  group_by(Species) %>%
+  summarize(
+    Sepal.Width = mean(Sepal.Width),
+    Sepal.Length = mean(Sepal.Length),
+    Petal.Length = mean(Petal.Length),
+    Petal.Width = mean(Petal.Width)
+  ) %>%
+  ungroup() %>%
+  collect()
+
+df_sub <- df_s %>%
+  filter(Species == "setosa") %>%
+  mutate(Petal.Dim = Petal.Length * Petal.Width) %>%
+  select(-Petal.Length, -Petal.Width) %>%
+  collect()
+```
+
+
+## Machine Learning with Spark
+
+It is possible to create a model in Spark, but we prefer the H2O framework and use it consistently throughout this repository.
+See [this Rstudio page](https://spark.rstudio.com/mlib/) for more information on creating machine learning models in Spark.
+
+# Closing the Connection
+
+Once you are done, remember to disconnect from the spark cluster using the `spark_disconnect()` function.
+This function completely shuts off the spark cluster and wipes all memory, so be sure any important data has been saved elsewhere before running.
+
+```{r}
+spark_disconnect(sc)
+```
+
