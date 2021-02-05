@@ -34,16 +34,15 @@ library(sparklyr)
 spark_install(version = "2.4.5")
 ```
 
-
 ## Starting a Spark Cluster
 
 To start a Spark cluster is fairly straightforward, but there are also lots of options that can be set.
 These options should be created as a list, where the name of the item in the list corresponds to the name of the option.
 A few of the options I regularly set are:
 
-* `sparklyr.cores.local` - sets the number of cores to work on in parallel
-* `sparklyr.shell.driver-memory` - sets the memory allocated to the spark cluster
-* `spark.memory.fraction` - sets the fraction of the allocated memory that the cluster is allowed to use
+-   `sparklyr.cores.local` - sets the number of cores to work on in parallel
+-   `sparklyr.shell.driver-memory` - sets the memory allocated to the spark cluster
+-   `spark.memory.fraction` - sets the fraction of the allocated memory that the cluster is allowed to use
 
 To see a comprehensive list of all the options, go to [this website](https://spark.rstudio.com/deployment/#configuration).
 
@@ -65,7 +64,6 @@ Once the options are set how you would like them, simply use the `spark_connect(
 ```{r}
 sc <- spark_connect(master = "local", version = "2.4.5", config = conf)
 ```
-
 
 # Using the Spark Cluster
 
@@ -95,7 +93,6 @@ df <- iris
 df_s <- copy_to(sc, df, name = "df_s") # 5.079
 ```
 
-
 ## Dplyr Data Manipulation in the Spark Cluster
 
 Data manipulation can proceed in the same way that it does when doing a tidyverse-based analysis of data.
@@ -123,7 +120,6 @@ df_sub <- df_s %>%
   collect()
 ```
 
-
 ## Machine Learning with Spark
 
 It is possible to create a model in Spark, but we prefer the H2O framework and use it consistently throughout this repository.
@@ -137,4 +133,3 @@ This function completely shuts off the spark cluster and wipes all memory, so be
 ```{r}
 spark_disconnect(sc)
 ```
-

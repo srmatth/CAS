@@ -3,15 +3,15 @@
 #### User Inputs ----
 
 # 1. Choose the data set that you wish to use, "bi", "pd", or "coll"
-data <- "bi"
+data <- "pd"
 
 # 2. set the relative directory of the data and the output (with forward slash at the end)
 data_loc <- "data/"
 output_loc <- "output/"
 
 # 3. Determine whether to predict the severity or the log of the severity
-response <- "severity"
-# response <- "log_severity"
+# response <- "severity"
+response <- "log_severity"
 
 # 4. Determine a frequency to save the predictions (ie. every "save_freq"th model the predictions get saved)
 save_freq <- 25
@@ -23,7 +23,7 @@ grid <- expand.grid(
     max_depth = c(1, 2, 3, 5, 7, 10),
     learn_rate = c(.001, .0001),
     min_split_improvement = c(.0001),
-    distribution = c("gaussian", "laplace", "huber"),
+    distribution = c("gaussian", "gamma"),
     sample_rate = c(.632),
     nbins_cats = c(56),
     categorical_encoding = c("Eigen"),
@@ -52,13 +52,23 @@ h2o::h2o.init(max_mem_size = "50G")
 ui_info("Reading in the data...")
 
 train_mem <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
-  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  filter(
+    ULTIMATE_CLAIM_COUNT > 0) %>%
   distinct() 
+if (response == "log_severity") {
+  train_mem <- train_mem %>%
+    filter(severity > 1)
+}
 train <- train_mem %>%
   as.h2o()
 ui_done("Train data read in!")
 validate_mem <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
-  filter(ULTIMATE_CLAIM_COUNT > 0) 
+  filter(
+    ULTIMATE_CLAIM_COUNT > 0) 
+if (response == "log_severity") {
+  validate_mem <- validate_mem %>%
+    filter(severity > 1)
+}
 validate <- validate_mem %>%
   as.h2o()
 ui_done("Validation data read in!")
@@ -83,8 +93,11 @@ for (i in 1:nrow(grid)) {
   
   if (grid_sub$distribution %in% c("huber", "laplace")) {
     ui_info("Sys.sleep to appropraitely shut down and reboot H2O...")
-    h2o.shutdown(prompt = FALSE)
-    Sys.sleep(5)
+    tryCatch({
+      h2o.shutdown(prompt = FALSE)
+    },
+    error = function(e) {ui_oops("Shutdown failed: {e}")})
+    Sys.sleep(10)
     
     h2o::h2o.init(max_mem_size = "50G")
     
@@ -122,7 +135,8 @@ for (i in 1:nrow(grid)) {
       nbins = grid_sub$nbins,
       categorical_encoding = grid_sub$categorical_encoding,
       seed = grid_sub$seed,
-      col_sample_rate_per_tree = grid_sub$col_sample_rate_per_tree
+      col_sample_rate_per_tree = grid_sub$col_sample_rate_per_tree,
+      max_runtime_sec = 1200
     )
     time <- toc()
     
@@ -174,12 +188,17 @@ for (i in 1:nrow(grid)) {
     write_csv(results, str_c(output_loc, data, "_gb_", response, "_tuning_results.csv"))
     # only write the predictions data frame once every so often, as it takes a long time
     if (i %% save_freq == 0 | i == nrow(grid)) {
+      ui_info("Saving Predictions...")
       fwrite(predictions, str_c(output_loc, data, "_gb_", response, "_predictions.csv"))
     }
     ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
     usethis::ui_oops("Model {i} failed!")
+    if (i %% save_freq == 0 | i == nrow(grid)) {
+      ui_info("Saving Predictions...")
+      fwrite(predictions, str_c(output_loc, data, "_gb_", response, "_predictions.csv"))
+    }
   })
 }
 
