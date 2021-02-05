@@ -30,3 +30,5 @@ vignettes/*.pdf
 README.html
 # the deprecated folder
 deprecated/
+# the .ipynb_chckpoints
+.ipynb_checkpoints/
