@@ -1,0 +1,552 @@
+---
+title: "Analyze BI Severity Model Tuning"
+author: "Spencer Matthews"
+date: "2/10/2021"
+output: html_document
+---
+
+# Setup
+
+## Rmarkdown Options
+
+```{r setup, echo = TRUE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE, out.width = "100%", message = FALSE, warning = FALSE)
+library(readr)
+library(dplyr)
+library(DT)
+library(plotly)
+
+root_dir <- "/Users/spencer.matthews/Documents/Research/Hartman/Repos/CAS"
+knitr::opts_knit$set(root.dir = root_dir)
+```
+
+## Data
+
+```{r, echo = TRUE}
+rf_log_sev <- read_csv("output/bi_severity_tuning/bi_rf_log_severity_tuning_results.csv")
+rf_sev <- read_csv("output/bi_severity_tuning/bi_rf_severity_tuning_results.csv")
+gb_log_sev <- read_csv("output/bi_severity_tuning/bi_gb_log_severity_tuning_results.csv")
+gb_sev <- read_csv("output/bi_severity_tuning/bi_gb_severity_tuning_results.csv")
+nn_log_sev <- read_csv("output/bi_severity_tuning/bi_nn_log_severity_tuning_results.csv")
+nn_sev <- read_csv("output/bi_severity_tuning/bi_nn_severity_tuning_results.csv")
+```
+
+# Severity Prediction Models (No Transform)
+
+## Random Forest Models
+
+```{r}
+rf_sev %>%
+  mutate(
+    histogram_type = ifelse(histogram_type == "UniformAdaptive", 0, 1)
+  ) %>%
+  plotly::plot_ly(
+    type = "parcoords",
+    line = list(color = ~mod_num,
+                colorscale = 'Jet',
+                showscale = TRUE,
+                reversescale = TRUE,
+                cmin = 0,
+                cmax = 252),
+    dimensions = list(
+      list(
+        tickvals = c(0, 1),
+        ticktext = c("UniformAdaptive", "Random"),
+        label = 'Histogram Type',
+        values = ~histogram_type
+      ),
+      list(
+        range = c(100, 200),
+        label = "ntrees",
+        values = ~ntrees
+      ),
+      list(
+        range = c(-1, 20),
+        label = "mtries",
+        values = ~mtries
+      ),
+      list(
+        range = c(3, 30),
+        label = "max_depth",
+        values = ~max_depth
+      ),
+      list(
+        range = c(.0001, .01),
+        label = "min_split_improvement",
+        values = ~min_split_improvement
+      ),
+      list(
+        range = c(min(.$rmse_valid), max(.$rmse_valid)),
+        label = "RMSE Valid",
+        values = ~rmse_valid
+      ),
+      list(
+        range = c(min(.$mae_valid), max(.$mae_valid)),
+        label = "MAE Valid",
+        values = ~mae_valid
+      )
+    )
+  )
+```
+
+```{r}
+rf_sev %>%
+  select(
+    mod_num,
+    ntrees,
+    max_depth,
+    mtries,
+    min_split_improvement,
+    histogram_type,
+    rmse_valid,
+    mae_valid
+  ) %>%
+  datatable(
+    rownames = FALSE,
+    colnames= c(
+      "Model #",
+      "Num Trees",
+      "Max Depth",
+      "Mtry",
+      "Min Split Improvement",
+      "Histogram Type",
+      "RMSE (Valid)",
+      "MAE (Valid)"
+    ),
+    extensions = "Scroller",
+    options = list(dom = "t", scrollY = 400, scroller = TRUE)
+  ) %>%
+  formatRound(
+    columns = c("rmse_valid", "mae_valid"),
+    digits = 2
+  )
+```
+
+
+## Gradient Boosted Models
+
+```{r, echo=FALSE}
+gb_sev %>%
+  mutate(
+    distribution = case_when(
+      distribution == "gaussian" ~ 0,
+      distribution == "huber" ~ 1,
+      TRUE ~ 2
+    )
+  ) %>%
+  plotly::plot_ly(
+    type = "parcoords",
+    line = list(color = ~mod_num,
+                colorscale = 'Jet',
+                showscale = TRUE,
+                reversescale = TRUE,
+                cmin = 0,
+                cmax = 108),
+    dimensions = list(
+      list(
+        tickvals = c(0, 1, 2),
+        ticktext = c("Gaussian", "Huber", "Laplace"),
+        label = 'Distribution',
+        values = ~distribution
+      ),
+      list(
+        range = c(300, 1000),
+        label = "ntrees",
+        values = ~ntrees
+      ),
+      list(
+        range = c(1, 10),
+        label = "max_depth",
+        values = ~max_depth
+      ),
+      list(
+        range = c(.0001, .001),
+        label = "learn_rate",
+        values = ~learn_rate
+      ),
+      list(
+        range = c(min(.$rmse_valid), max(.$rmse_valid)),
+        label = "RMSE Valid",
+        values = ~rmse_valid
+      ),
+      list(
+        range = c(min(.$mae_valid), max(.$mae_valid)),
+        label = "MAE Valid",
+        values = ~mae_valid
+      )
+    )
+  )
+```
+
+```{r, echo=FALSE}
+gb_sev %>%
+  select(
+    mod_num,
+    distribution,
+    ntrees,
+    max_depth,
+    learn_rate,
+    rmse_valid,
+    mae_valid
+  ) %>%
+  datatable(
+    rownames = FALSE,
+    colnames= c(
+      "Model #",
+      "Distribution",
+      "Num Trees",
+      "Max Depth",
+      "Learn Rate",
+      "RMSE (Valid)",
+      "MAE (Valid)"
+    ),
+    extensions = "Scroller",
+    options = list(dom = "t", scrollY = 400, scroller = TRUE)
+  ) %>%
+  formatRound(
+    columns = c("rmse_valid", "mae_valid"),
+    digits = 2
+  )
+```
+
+## Neural Network Models
+
+```{r, echo=FALSE}
+nn_sev %>%
+  mutate(
+    distribution = ifelse(distribution == "gaussian", 0, 1)
+  ) %>%
+  plotly::plot_ly(
+    type = "parcoords",
+    line = list(color = ~mod_num,
+                colorscale = 'Jet',
+                showscale = TRUE,
+                reversescale = TRUE,
+                cmin = 0,
+                cmax = 32),
+    dimensions = list(
+      list(
+        tickvals = c(0, 1),
+        ticktext = c("Gaussian", "Laplace"),
+        label = 'Distribution',
+        values = ~distribution
+      ),
+      list(
+        range = c(100, 400),
+        label = "total_nodes",
+        values = ~total_nodes
+      ),
+      list(
+        range = c(1, 3),
+        label = "num_layers",
+        values = ~num_layers
+      ),
+      list(
+        range = c(1e-05, 1e-02),
+        label = "rate",
+        values = ~rate
+      ),
+      list(
+        range = c(min(.$rmse_valid), max(.$rmse_valid)),
+        label = "RMSE Valid",
+        values = ~rmse_valid
+      ),
+      list(
+        range = c(min(.$mae_valid), max(.$mae_valid)),
+        label = "MAE Valid",
+        values = ~mae_valid
+      )
+    )
+  )
+```
+
+```{r, echo=FALSE}
+nn_sev %>%
+  select(
+    mod_num,
+    distribution,
+    total_nodes,
+    num_layers,
+    rate,
+    rmse_valid,
+    mae_valid
+  ) %>%
+  datatable(
+    rownames = FALSE,
+    colnames= c(
+      "Model #",
+      "Distribution",
+      "Total Nodes",
+      "Num Layers",
+      "Learn Rate",
+      "RMSE (Valid)",
+      "MAE (Valid)"
+    ),
+    extensions = "Scroller",
+    options = list(dom = "t", scrollY = 400, scroller = TRUE)
+  ) %>%
+  formatRound(
+    columns = c("rmse_valid", "mae_valid"),
+    digits = 2
+  )
+```
+
+# Log Severity Prediction Models (Log Transform)
+
+## Random Forest Models
+
+```{r}
+rf_log_sev %>%
+  mutate(
+    histogram_type = ifelse(histogram_type == "UniformAdaptive", 0, 1)
+  ) %>%
+  plotly::plot_ly(
+    type = "parcoords",
+    line = list(color = ~mod_num,
+                colorscale = 'Jet',
+                showscale = TRUE,
+                reversescale = TRUE,
+                cmin = 0,
+                cmax = 252),
+    dimensions = list(
+      list(
+        tickvals = c(0, 1),
+        ticktext = c("UniformAdaptive", "Random"),
+        label = 'Histogram Type',
+        values = ~histogram_type
+      ),
+      list(
+        range = c(100, 200),
+        label = "ntrees",
+        values = ~ntrees
+      ),
+      list(
+        range = c(-1, 20),
+        label = "mtries",
+        values = ~mtries
+      ),
+      list(
+        range = c(3, 30),
+        label = "max_depth",
+        values = ~max_depth
+      ),
+      list(
+        range = c(.0001, .01),
+        label = "min_split_improvement",
+        values = ~min_split_improvement
+      ),
+      list(
+        range = c(min(.$rmse_valid), max(.$rmse_valid)),
+        label = "RMSE Valid",
+        values = ~rmse_valid
+      ),
+      list(
+        range = c(min(.$mae_valid), max(.$mae_valid)),
+        label = "MAE Valid",
+        values = ~mae_valid
+      )
+    )
+  )
+```
+
+```{r}
+rf_log_sev %>%
+  select(
+    mod_num,
+    ntrees,
+    max_depth,
+    mtries,
+    min_split_improvement,
+    histogram_type,
+    rmse_valid,
+    mae_valid
+  ) %>%
+  datatable(
+    rownames = FALSE,
+    colnames= c(
+      "Model #",
+      "Num Trees",
+      "Max Depth",
+      "Mtry",
+      "Min Split Improvement",
+      "Histogram Type",
+      "RMSE (Valid)",
+      "MAE (Valid)"
+    ),
+    extensions = "Scroller",
+    options = list(dom = "t", scrollY = 400, scroller = TRUE)
+  ) %>%
+  formatRound(
+    columns = c("rmse_valid", "mae_valid"),
+    digits = 5
+  )
+```
+
+
+## Gradient Boosted Models
+
+```{r, echo=FALSE}
+gb_log_sev %>%
+  mutate(
+    distribution = case_when(
+      distribution == "gamma" ~ 0,
+      distribution == "gaussian" ~ 1,
+      TRUE ~ 2
+    )
+  ) %>%
+  plotly::plot_ly(
+    type = "parcoords",
+    line = list(color = ~mod_num,
+                colorscale = 'Jet',
+                showscale = TRUE,
+                reversescale = TRUE,
+                cmin = 0,
+                cmax = 72),
+    dimensions = list(
+      list(
+        tickvals = c(0, 1),
+        ticktext = c("Gamma", "Gaussian"),
+        label = 'Distribution',
+        values = ~distribution
+      ),
+      list(
+        range = c(300, 1000),
+        label = "ntrees",
+        values = ~ntrees
+      ),
+      list(
+        range = c(1, 10),
+        label = "max_depth",
+        values = ~max_depth
+      ),
+      list(
+        range = c(.0001, .001),
+        label = "learn_rate",
+        values = ~learn_rate
+      ),
+      list(
+        range = c(min(.$rmse_valid), max(.$rmse_valid)),
+        label = "RMSE Valid",
+        values = ~rmse_valid
+      ),
+      list(
+        range = c(min(.$mae_valid), max(.$mae_valid)),
+        label = "MAE Valid",
+        values = ~mae_valid
+      )
+    )
+  )
+```
+
+```{r, echo=FALSE}
+gb_log_sev %>%
+  select(
+    mod_num,
+    distribution,
+    ntrees,
+    max_depth,
+    learn_rate,
+    rmse_valid,
+    mae_valid
+  ) %>%
+  datatable(
+    rownames = FALSE,
+    colnames= c(
+      "Model #",
+      "Distribution",
+      "Num Trees",
+      "Max Depth",
+      "Learn Rate",
+      "RMSE (Valid)",
+      "MAE (Valid)"
+    ),
+    extensions = "Scroller",
+    options = list(dom = "t", scrollY = 400, scroller = TRUE)
+  ) %>%
+  formatRound(
+    columns = c("rmse_valid", "mae_valid"),
+    digits = 5
+  )
+```
+
+## Neural Network Models
+
+```{r, echo=FALSE}
+nn_log_sev %>%
+  mutate(
+    distribution = ifelse(distribution == "gaussian", 0, 1)
+  ) %>%
+  plotly::plot_ly(
+    type = "parcoords",
+    line = list(color = ~mod_num,
+                colorscale = 'Jet',
+                showscale = TRUE,
+                reversescale = TRUE,
+                cmin = 0,
+                cmax = 32),
+    dimensions = list(
+      list(
+        tickvals = c(0, 1),
+        ticktext = c("Gaussian", "Laplace"),
+        label = 'Distribution',
+        values = ~distribution
+      ),
+      list(
+        range = c(100, 400),
+        label = "total_nodes",
+        values = ~total_nodes
+      ),
+      list(
+        range = c(1, 3),
+        label = "num_layers",
+        values = ~num_layers
+      ),
+      list(
+        range = c(1e-05, 1e-02),
+        label = "rate",
+        values = ~rate
+      ),
+      list(
+        range = c(min(.$rmse_valid), max(.$rmse_valid)),
+        label = "RMSE Valid",
+        values = ~rmse_valid
+      ),
+      list(
+        range = c(min(.$mae_valid), max(.$mae_valid)),
+        label = "MAE Valid",
+        values = ~mae_valid
+      )
+    )
+  )
+```
+
+```{r, echo=FALSE}
+nn_log_sev %>%
+  select(
+    mod_num,
+    distribution,
+    total_nodes,
+    num_layers,
+    rate,
+    rmse_valid,
+    mae_valid
+  ) %>%
+  datatable(
+    rownames = FALSE,
+    colnames= c(
+      "Model #",
+      "Distribution",
+      "Total Nodes",
+      "Num Layers",
+      "Learn Rate",
+      "RMSE (Valid)",
+      "MAE (Valid)"
+    ),
+    extensions = "Scroller",
+    options = list(dom = "t", scrollY = 400, scroller = TRUE)
+  ) %>%
+  formatRound(
+    columns = c("rmse_valid", "mae_valid"),
+    digits = 5
+  )
+```
