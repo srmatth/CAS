@@ -1,0 +1,374 @@
+---
+title: "Determining Alpha"
+author: "Spencer Matthews"
+date: "3/1/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+getwd()
+# source the file with the functions we need
+source("functions.R")
+
+library(dplyr)
+library(reticulate)
+```
+
+# Introduction and Brief Overview
+
+# Creating the Data and Models
+
+First we will set up our python environment with the modules and functions that we will need.
+In this process, we will need numpy and pandas, as well as shap to eventually get the SHAP values for our models.
+We will be using sickit-learn gradient-boosted trees for our models, so we import the function needed for that as well.
+```{python}
+import numpy as np
+import pandas as pd
+import shap
+from sklearn.ensemble import GradientBoostingRegressor
+np.random.seed(15)
+```
+
+
+We will then create our data, using random uniform distributions on various scales.
+There will be three different responses, where the first two are simply additive and the last one is the first two multiplied together.
+This will simulate a simple situation of a two-part model where we multiply the outputs, as we will be doing with the CAS data.
+```{python}
+# the covariates
+x1 = np.random.uniform(low = -10, high = 10, size = 1000)
+x2 = np.random.uniform(low = 0, high = 20, size = 1000)
+x3 = np.random.uniform(low = -5, high = -1, size = 1000)
+
+dat = {"x1":x1, "x2":x2, "x3":x3}
+X = pd.DataFrame(data = dat)
+
+# the first set of responses
+y1 = x1 + x2 + x3
+y2 = 2*x1 + 2*x2 + 4*x3
+y3 = y1 * y2
+```
+
+
+Finally, we will fit the models with minimal tuning parameters and calculate the SHAP values.
+It will also be important to have the explainer itself so we can get the expected value into R.
+Also, we will want to calculate what our multiplicative model will predict, so we can verify that the additive property of SHAP values still holds up.
+And finally, it is a good idea to save the third model prediction so that we know how that model does in comparison to our multiplicative model.
+```{python}
+# Get the models
+mody1 = GradientBoostingRegressor(loss = "ls", min_samples_leaf = 2)
+mody1.fit(X, y1)
+
+mody2 = GradientBoostingRegressor(loss = "ls", min_samples_leaf = 2)
+mody2.fit(X, y2)
+
+mody3 = GradientBoostingRegressor(loss = "ls", min_samples_leaf = 2)
+mody3.fit(X, y3)
+
+# Get the explainers and the SHAP values
+exy1 = shap.TreeExplainer(mody1)
+y1ex = exy1.expected_value
+shapy1 = exy1.shap_values(X)
+
+exy2 = shap.TreeExplainer(mody2)
+y2ex = exy2.expected_value
+shapy2 = exy2.shap_values(X)
+
+exy3 = shap.TreeExplainer(mody3)
+y3ex = exy3.expected_value
+shapy3 = exy3.shap_values(X)
+
+preds3_real = mody1.predict(X) * mody2.predict(X)
+
+preds3 = mody3.predict(X)
+```
+
+# Computing the Multiplicative SHAP Values Using the Proposed Method
+
+To aid in the computation of Multiplicative SHAP values, we have written a function in R which will return a list containing valuable information about the SHAP values.
+The code for the function is as follows:
+
+```{r}
+multiply_shap <- function(shap1, shap2, ex1, ex2) {
+  # Error Checking
+  if (min(dim(shap1) == dim(shap2)) == FALSE) {
+    stop("`shap1` and `shap2` must have the same dimensions")
+  }
+  if (length(ex1) > 1) {
+    warning("`ex1` has a length greater than 1, only using first element")
+    ex1 <- ex1[1]
+  }
+  if (length(ex2) > 1) {
+    warning("`ex2` has a length greater than 1, only using first element")
+    ex2 <- ex2[1]
+  }
+  
+  d <- purrr::map_dfc(
+    .x = 1:ncol(shap1),
+    .f = ~{
+      (shap1 %>% dplyr::pull(.x)) * c(ex2) + 
+        (shap2 %>% dplyr::pull(.x)) * c(ex1) + 
+        ((shap1 %>% dplyr::pull(.x)) * (shap2 %>% rowSums())) / 2 +
+        ((shap1 %>% rowSums()) * (shap2 %>% dplyr::pull(.x))) / 2
+    }
+  ) %>%
+    magrittr::set_colnames(stringr::str_c("s", 1:ncol(shap1)))
+  
+  expected_value <- d %>% 
+    rowSums() %>% 
+    `+`(ex1 * ex2) %>%
+    mean()
+  
+  # return a list with what we want
+  list(
+    vals = d,
+    ex1ex2 = ex1 * ex2,
+    ex3 = expected_value,
+    alpha = ex1 * ex2 - expected_value
+  )
+}
+```
+
+When applied to one of the objects from python, we get the following:
+```{r}
+final_shap <- multiply_shap(
+  shap1 = py$shapy1 %>% as.data.frame(), 
+  shap2 = py$shapy2 %>% as.data.frame(), 
+  ex1 = c(py$y1ex), 
+  ex2 = c(py$y2ex)
+)
+str(final_shap)
+```
+
+# Distributing Alpha Introduction
+
+This list object can then be passed to the following function that was written for distributing alpha, in any one of four different ways.
+
+```{r}
+distribute_alpha <- function(multiplied_shap, method = "uniform") {
+  if (method == "uniform") {
+    d <- purrr::map_dfc(
+      .x = multiplied_shap$vals,
+      .f = ~{
+        .x + (multiplied_shap$alpha / ncol(multiplied_shap$vals))
+      }
+    )
+  } else if (method == "weighted_raw") {
+    tot_s <- rowSums(multiplied_shap$vals)
+    d <- purrr::map_dfc(
+      .x = multiplied_shap$vals,
+      .f = ~{
+        .x + (.x / tot_s) * (multiplied_shap$alpha)
+      }
+    )
+  } else if (method == "weighted_absolute") {
+    tot_s <- rowSums(abs(multiplied_shap$vals))
+    d <- purrr::map_dfc(
+      .x = multiplied_shap$vals,
+      .f = ~{
+        .x + (abs(.x) / tot_s) * (multiplied_shap$alpha)
+      }
+    )
+  } else if (method == "weighted_squared") {
+    tot_s <- rowSums(multiplied_shap$vals^2)
+    d <- purrr::map_dfc(
+      .x = multiplied_shap$vals,
+      .f = ~{
+        .x + ((.x ^ 2) / tot_s) * (multiplied_shap$alpha)
+      }
+    )
+  }
+  
+  d %>%
+    dplyr::mutate(expected_value = multiplied_shap$ex3) %>%
+    dplyr::mutate(predicted_val = rowSums(.))
+}
+```
+
+Which when applied in the uniform case returns the following:
+```{r}
+shap_unif <- final_shap %>% distribute_alpha("uniform")
+shap_w_raw <- final_shap %>% distribute_alpha("weighted_raw")
+shap_w_sq <- final_shap %>% distribute_alpha("weighted_squared")
+shap_w_abs <- final_shap %>% distribute_alpha("weighted_absolute")
+head(shap_unif)
+```
+
+This dataframe contains the SHAP values for each variable, the expected value for the model output (based on the training data) and the predicted value (the sum of the expected value and all the SHAP values).
+With this, we have something that we can compare against what we might expect the SHAP values to be.
+
+# Methods for Distributing Alpha
+
+## Uniform Distribution
+
+## Weighted Distribution - Raw Value
+
+## Weighted Distribution - Squared Value
+
+## Weighted Distribution - Absolute Value
+
+# Assessment of Methods
+
+```{python}
+def pred_fun(X):
+  a = mody1.predict(X) * mody2.predict(X)
+  return a
+
+kernelex = shap.KernelExplainer(pred_fun, X)
+real_shap_vals = kernelex.shap_values(X)
+
+real_ex = kernelex.expected_value
+```
+
+Just to be noted, that took 4 minutes and 15 seconds, and it is an approximation.
+But now, we have what the kernel explainer would predict for the different SHAP values, we can import that into R and compare to what we obtained above.
+
+We will now get this real shap value object into R and perform some mutates to make sure it has all the attributes we need.
+```{r}
+real_shap <- py$real_shap_vals %>% 
+  as.data.frame() %>%
+  magrittr::set_colnames(paste0("s", 1:ncol(.), "_real")) %>%
+  mutate(expected_value = py$real_ex) %>%
+  mutate(predicted_val = rowSums(.))
+```
+
+
+We will also make use of a function to compute some basic information about the differences and similarities in each column
+
+```{r}
+calculate_scores_summarized <- function(test, real, test_rank, real_rank, theta1, theta2, variable) {
+  data.frame(
+        mae = (sum(abs(test - real))) / length(test),
+        rmse = sqrt((sum((test_shap - real)^2)) / length(test)),
+        pct_same_sign = mean((test * real) > 0),
+        pct_same_rank = mean(test_rank == real_rank),
+        direction_contrib = mean(ifelse((test * real) > 0, 1, min(1, (2 * theta1) / (abs(test) + abs(real)) + theta1))),
+        relative_mag_contrib = mean(ifelse((1 + theta2) / (abs(test - real) + 1) > 1, 1, (1 + theta2) / (abs(test - real) + 1))),
+        rank_contrib = mean(1 / (abs(test_rank - real_rank) + 1)),
+        stringsAsFactors = FALSE
+      ) %>%
+    mutate(
+      score = direction_contrib + relative_mag_contrib + rank_contrib,
+      variable = variable
+    )
+}
+calculate_scores <- function(test, real, test_rank, real_rank, theta1, theta2, variable) {
+  data.frame(
+    direction_contrib = ifelse((test * real) > 0, 1, min(1, (2 * theta1) / (abs(test) + abs(real)) + theta1)),
+    relative_mag_contrib = ifelse((1 + theta2) / (abs(test - real) + 1) > 1, 1, (1 + theta2) / (abs(test - real) + 1)),
+    rank_contrib = 1 / (abs(test_rank - real_rank) + 1),
+    stringsAsFactors = FALSE
+  ) %>%
+    mutate(
+      score = direction_contrib + relative_mag_contrib + rank_contrib,
+      variable = variable
+    )
+}
+
+compare_shap_vals <- function(test_shap, real_shap, theta1, theta2) {
+  # Get rank of SHAP values for each variable
+  rank_test <- test_shap %>% 
+    select(-expected_value, -predicted_val) %>% 
+    t() %>% 
+    as.data.frame() %>%
+    mutate(across(everything(), ~rank(-abs(.x), ties.method = "average"))) %>%
+    t() %>%
+    as.data.frame() %>%
+    magrittr::set_rownames(NULL) %>%
+    magrittr::set_colnames(paste0("s", 1:ncol(.), "_rank"))
+  rank_real <- real_shap %>% 
+    select(-expected_value, -predicted_val) %>% 
+    t() %>% 
+    as.data.frame() %>%
+    mutate(across(everything(), ~rank(-abs(.x), ties.method = "average"))) %>%
+    t() %>%
+    as.data.frame() %>%
+    magrittr::set_rownames(NULL) %>%
+    magrittr::set_colnames(paste0("s", 1:ncol(.), "_rank"))
+  x <- purrr::pmap_dfr(
+    .l = list(
+      test = test_shap %>% select(-expected_value, -predicted_val),
+      real = real_shap %>% select(-expected_value, -predicted_val),
+      test_rank = rank_test,
+      real_rank = rank_real,
+      variable = colnames(test_shap %>% select(-expected_value, -predicted_val))
+    ),
+    .f = calculate_scores,
+    theta1 = theta1,
+    theta2 = theta2
+  )
+  y <- purrr::pmap_dfr(
+    .l = list(
+      test = test_shap %>% select(-expected_value, -predicted_val),
+      real = real_shap %>% select(-expected_value, -predicted_val),
+      test_rank = rank_test,
+      real_rank = rank_real,
+      variable = colnames(test_shap %>% select(-expected_value, -predicted_val))
+    ),
+    .f = calculate_scores_summarized,
+    theta1 = theta1,
+    theta2 = theta2
+  )
+  list(
+    summarized = y,
+    detailed = x
+  )
+}
+```
+
+
+## Uniformly Distributed
+
+```{r}
+res_unif <- compare_shap_vals(shap_unif, real_shap, 0.8, 6)
+res_unif$summarized
+```
+
+## Weighted Distribution with the Raw Values
+
+```{r}
+res_raw <- compare_shap_vals(shap_w_raw, real_shap, 0.8, 6)
+res_raw$summarized
+```
+
+## Weighted Distribution with the Squared Values
+
+```{r}
+res_sq <- compare_shap_vals(shap_w_sq, real_shap, 0.8, 6)
+res_sq$summarized
+```
+
+## Weighted Distribution with the Absolute Values
+
+```{r}
+res_abs <- compare_shap_vals(shap_w_abs, real_shap, 0.8, 6)
+res_abs$summarized
+```
+
+```{r}
+res_unif$summarized %>%
+  mutate(method = "summarized") %>%
+  rbind(res_raw$summarized %>% mutate(method = "weighted_raw")) %>%
+  rbind(res_abs$summarized %>% mutate(method = "weighted_abs")) %>%
+  rbind(res_sq$summarized %>% mutate(method = "weighted_squared"))
+```
+
+
+```{r}
+s <- test_multiplicative_shap()
+s1 <- test_multiplicative_shap(
+  y1 = "(x1 + x2) * x3 + (x3 + x1) * x2",
+  y2 = "x1 + log(x2) + x3^2",
+  sample = 500L,
+  theta1 = 0.99,
+  theta2 = 10
+)
+s2 <- test_multiplicative_shap(
+  y1 = "x1 * x2 * x3",
+  y2 = "x1 + exp(x2) + x3^3",
+  sample = 100L,
+  theta1 = 0.99,
+  theta2 = 10
+)
+```
+
