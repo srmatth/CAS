@@ -1,3 +1,10 @@
+#### Create the lambda Function Plots ####
+
+# This file will create the plots used to visualize and understand the lambda functions
+# used in the scoring equation for the methods of distributing alpha
+
+#### Create the Data ----
+
 x <- seq(-10, 10, by = 0.05)
 y <- seq(-10, 10, by = 0.05)
 
@@ -20,6 +27,8 @@ lambdas <- list(x = x, y = y) %>%
     )
   )
 
+#### Lambda 1 ----
+
 lambdas %>%
   ggplot() +
   aes(x = as.factor(x), y = as.factor(y), fill = lambda1) +
@@ -32,6 +41,8 @@ lambdas %>%
   ) +
   xlab(expression(s[zij])) +
   ylab(expression(k[zij]))
+
+#### Lambda 2 ----
 
 lambdas %>%
   ggplot() +

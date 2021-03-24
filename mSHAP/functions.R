@@ -1,3 +1,10 @@
+#### Functions for the simulation ####
+
+# This file contains functions that help carry out the simulation on distributing alpha
+# The functions are not documented, but only get used in the simulation
+# The order/process of how the simulation was carried out can be found in the simulation.R file
+
+#### Multiply SHAP ----
 multiply_shap <- function(shap1, shap2, ex1, ex2) {
   # Error Checking
   if (min(dim(shap1) == dim(shap2)) == FALSE) {
@@ -36,6 +43,7 @@ multiply_shap <- function(shap1, shap2, ex1, ex2) {
   )
 }
 
+#### Distribute Alpha ----
 distribute_alpha <- function(multiplied_shap, method = "uniform") {
   if (method == "uniform") {
     d <- purrr::map_dfc(
@@ -75,6 +83,7 @@ distribute_alpha <- function(multiplied_shap, method = "uniform") {
     dplyr::mutate(predicted_val = rowSums(.))
 }
 
+#### Calculate Summarized Scores ----
 calculate_scores_summarized <- function(test, real, test_rank, real_rank, theta1, theta2, variable) {
   data.frame(
     mae = (sum(abs(test - real))) / length(test),
@@ -93,6 +102,8 @@ calculate_scores_summarized <- function(test, real, test_rank, real_rank, theta1
       variable = variable
     )
 }
+
+#### Calculate Scores ----
 calculate_scores <- function(test, real, test_rank, real_rank, theta1, theta2, variable) {
   data.frame(
     direction_contrib = ifelse((test * real) > 0, 1, min(1, (2 * theta1) / (abs(test) + abs(real) + theta1))),
@@ -106,6 +117,7 @@ calculate_scores <- function(test, real, test_rank, real_rank, theta1, theta2, v
     )
 }
 
+#### Compare mSHAP Values to kernelSHAP ----
 compare_shap_vals <- function(test_shap, real_shap, theta1, theta2) {
   # Get rank of SHAP values for each variable
   rank_test <- test_shap %>% 
@@ -156,6 +168,7 @@ compare_shap_vals <- function(test_shap, real_shap, theta1, theta2) {
   )
 }
 
+#### Create Model and get SHAP values ----
 py_shap_vals <- function(y1 = "x1 + x2 + x3", y2 = "2*x1 + 2*x2 + 2*x3", sample = 100L, seed = 15L) {
   np <- reticulate::import("numpy")
   pd <- reticulate::import("pandas")
@@ -211,7 +224,7 @@ py_shap_vals <- function(y1 = "x1 + x2 + x3", y2 = "2*x1 + 2*x2 + 2*x3", sample 
   )
 }
 
-## Put it all together in one function
+#### Put it all together ----
 test_multiplicative_shap <- function(
   y1 = "x1 + x2 + x3", 
   y2 = "2*x1 + 2*x2 + 2*x3", 
@@ -243,7 +256,7 @@ test_multiplicative_shap <- function(
     dplyr::select(y1, y2, theta1, theta2, sample, method, variable, dplyr::everything())
 }
 
-## compare times for given value of `sample`
+#### compare times between mSHAP and kernelSHAP ----
 compare_times <- function(sample, vars) {
   np <- reticulate::import("numpy")
   pd <- reticulate::import("pandas")

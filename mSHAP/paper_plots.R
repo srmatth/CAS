@@ -1,3 +1,7 @@
+#### Create Plots in the Paper ####
+
+# This file will create the various plots used in the mSHAP paper
+
 ## Score Plots ----
 all_tests <- readr::read_csv("Multiplicative SHAP/all_tests_results.csv")
 
@@ -29,20 +33,6 @@ all_tests %>%
   ) +
   labs(color = expression(theta[2])) +
   scale_color_viridis_d() +
-  # scale_color_manual(
-  #   values = c(
-  #     "#335C67",
-  #     "#66827A",
-  #     "#99A88C",
-  #     "#CCCE9E",
-  #     "#FFF3B0",
-  #     "#F0C977",
-  #     "#E09F3E",
-  #     "#BF6535",
-  #     "#9E2A2B",
-  #     "#540B0E"
-  #   )
-  # ) +
   geom_smooth(se = FALSE, method = "lm") +
   theme(
     plot.title = element_text(hjust = 0.5),
