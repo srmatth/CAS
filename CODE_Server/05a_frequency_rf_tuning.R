@@ -13,7 +13,7 @@ output_loc <- "output/"
 response <- "ULTIMATE_CLAIM_COUNT"
 
 # 4. Determine a frequency to save the predictions (ie. every "save_freq"th model the predictions get saved)
-save_freq <- 25
+save_freq <- 1
 
 # 4. Create a tuning grid
 grid <- expand.grid(

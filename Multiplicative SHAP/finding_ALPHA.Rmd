@@ -1,5 +1,5 @@
 ---
-title: "Determining Alpha"
+title: "Distributing Alpha"
 author: "Spencer Matthews"
 date: "3/1/2021"
 output: pdf_document

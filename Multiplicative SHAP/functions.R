@@ -78,10 +78,12 @@ distribute_alpha <- function(multiplied_shap, method = "uniform") {
 calculate_scores_summarized <- function(test, real, test_rank, real_rank, theta1, theta2, variable) {
   data.frame(
     mae = (sum(abs(test - real))) / length(test),
+    mae_when_not_same_sign = mean(c(abs(test - real))[test * real > 0]),
     rmse = sqrt((sum((test - real)^2)) / length(test)),
     pct_same_sign = mean((test * real) > 0),
     pct_same_rank = mean(test_rank == real_rank),
-    direction_contrib = mean(ifelse((test * real) > 0, 1, min(1, (2 * theta1) / (abs(test) + abs(real)) + theta1))),
+    avg_diff_in_rank_when_not_equal = mean(abs(test_rank - real_rank)[test_rank != real_rank]),
+    direction_contrib = mean(ifelse((test * real) > 0, 1, min(1, (2 * theta1) / (abs(test) + abs(real) + theta1)))),
     relative_mag_contrib = mean(ifelse((1 + theta2) / (abs(test - real) + 1) > 1, 1, (1 + theta2) / (abs(test - real) + 1))),
     rank_contrib = mean(1 / (abs(test_rank - real_rank) + 1)),
     stringsAsFactors = FALSE
@@ -93,7 +95,7 @@ calculate_scores_summarized <- function(test, real, test_rank, real_rank, theta1
 }
 calculate_scores <- function(test, real, test_rank, real_rank, theta1, theta2, variable) {
   data.frame(
-    direction_contrib = ifelse((test * real) > 0, 1, min(1, (2 * theta1) / (abs(test) + abs(real)) + theta1)),
+    direction_contrib = ifelse((test * real) > 0, 1, min(1, (2 * theta1) / (abs(test) + abs(real) + theta1))),
     relative_mag_contrib = ifelse((1 + theta2) / (abs(test - real) + 1) > 1, 1, (1 + theta2) / (abs(test - real) + 1)),
     rank_contrib = 1 / (abs(test_rank - real_rank) + 1),
     stringsAsFactors = FALSE
@@ -213,12 +215,11 @@ py_shap_vals <- function(y1 = "x1 + x2 + x3", y2 = "2*x1 + 2*x2 + 2*x3", sample 
 test_multiplicative_shap <- function(
   y1 = "x1 + x2 + x3", 
   y2 = "2*x1 + 2*x2 + 2*x3", 
-  model = "Addition", 
   sample = 100L, 
   theta1 = 0.8, 
   theta2 = 7
 ) {
-  
+  usethis::ui_info("Comupting performance of multiplcative SHAP for {y1} and {y2} with theta1 = {theta1} and theta2 = {theta2} on {sample} samples")
   l <- py_shap_vals(y1, y2, sample = sample)
   
   test_shap <- multiply_shap(l$shap1, l$shap2, c(l$ex1), c(l$ex2))
@@ -234,19 +235,74 @@ test_multiplicative_shap <- function(
   res_abs <- compare_shap_vals(shap_w_abs, l$real_shap, theta1, theta2)
   
   res_unif$summarized %>%
-    mutate(method = "summarized") %>%
+    mutate(method = "uniform") %>%
     rbind(res_raw$summarized %>% mutate(method = "weighted_raw")) %>%
     rbind(res_abs$summarized %>% mutate(method = "weighted_abs")) %>%
     rbind(res_sq$summarized %>% mutate(method = "weighted_squared")) %>%
-    dplyr::mutate(model = model) %>%
-    dplyr::select(model, method, variable, dplyr::everything())
+    dplyr::mutate(y1 = y1, y2 = y2, theta1 = theta1, theta2 = theta2, sample = sample) %>%
+    dplyr::select(y1, y2, theta1, theta2, sample, method, variable, dplyr::everything())
 }
 
-
-# testing
-
-# final_shap_1 <- multiply_shap(shapy1, shapy2, c(py$y1ex), c(py$y2ex))
-# final_shap_1 %>% distribute_alpha("uniform")
-# final_shap_1 %>% distribute_alpha("weighted_raw")
-# final_shap_1 %>% distribute_alpha("weighted_absolute")
-# final_shap_1 %>% distribute_alpha("weighted_squared")
+## compare times for given value of `sample`
+compare_times <- function(sample, vars) {
+  np <- reticulate::import("numpy")
+  pd <- reticulate::import("pandas")
+  shap <- reticulate::import("shap")
+  sklearn <- reticulate::import("sklearn.ensemble")
+  gbr <- sklearn$GradientBoostingRegressor
+  
+  
+  np$random$seed(16L)
+  
+  X <- purrr::map_dfc(
+    .x = 1:as.integer(vars),
+    .f = ~{
+      np$random$uniform(low = -10L, high = 10L, size = as.integer(sample))
+    }
+  ) %>%
+    magrittr::set_colnames(
+      stringr::str_c("x", 1:vars)
+    )
+  
+  y1 <- rowSums(X)
+  y2 <- rowSums(2 * X)
+  
+  mod1 <- gbr(loss = "ls", min_samples_leaf = 2L)
+  mod1$fit(X, y1)
+  
+  mod2 <- gbr(loss = "ls", min_samples_leaf = 2L)
+  mod2$fit(X, y2)
+  
+  tictoc::tic("Multiplicative SHAP")
+  exy1 <- shap$TreeExplainer(mod1)
+  y1ex <- exy1$expected_value
+  shapy1 <- exy1$shap_values(X) %>% as.data.frame()
+  
+  exy2 = shap$TreeExplainer(mod2)
+  y2ex = exy2$expected_value
+  shapy2 = exy2$shap_values(X) %>% as.data.frame()
+  
+  multiplied_shap <- multiply_shap(shapy1, shapy2, c(y1ex), c(y2ex)) %>%
+    distribute_alpha("weighted_absolute")
+  multiplied_time <- tictoc::toc()
+  
+  tictoc::tic("kernel ex")
+  pred <- function(X) {
+    mod1$predict(X) * mod2$predict(X)
+  }
+  
+  kernelex <- shap$KernelExplainer(py_func(pred), X[1:100,])
+  real_shap_vals <- kernelex$shap_values(X) %>%
+    as.data.frame() %>%
+    magrittr::set_colnames(paste0("s", 1:ncol(.), "_real")) %>%
+    mutate(expected_value = kernelex$expected_value) %>%
+    mutate(predicted_val = rowSums(.))
+  kernel_time <- tictoc::toc()
+  
+  data.frame(
+    smaple_size = sample,
+    num_variables = vars,
+    kernel_time = kernel_time$toc - kernel_time$tic,
+    multiplicative_time = multiplied_time$toc - multiplied_time$tic
+  )
+}

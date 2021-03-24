@@ -12,7 +12,10 @@ output_loc <- "output/"
 # 3. Determine the Response (This shouldn't change)
 response <- "ULTIMATE_CLAIM_COUNT"
 
-# 4. Create a tuning grid
+# 4. Set a frequency to save the predictions
+save_freq <- 1
+
+# 5. Create a tuning grid
 grid <- expand.grid(
   list(
     ntrees = c(300, 500, 1000),
@@ -22,7 +25,7 @@ grid <- expand.grid(
     distribution = c("multinomial"),
     sample_rate = c(.632),
     nbins_cats = c(56),
-    categorical_encoding = c("Eigen", "LabelEncoder"),
+    categorical_encoding = c("Eigen"),
     col_sample_rate_per_tree = c(.8),
     seed = 16
   ),
@@ -142,12 +145,19 @@ for (i in 1:nrow(grid)) {
     results <- rbind(results, results_tmp)
     predictions <- rbind(predictions, predictions_tmp)
     write_csv(results, str_c(output_loc, data, "_gb_", tolower(response), "_tuning_results.csv"))
-    fwrite(predictions, str_c(output_loc, data, "_gb_", tolower(response), "_predictions.csv"))
+    if (i %% save_freq == 0 | i == nrow(grid)) {
+      ui_info("Writing prediction data...")
+      fwrite(predictions, str_c(output_loc, data, "_gb_", tolower(response), "_predictions.csv"))
+    }
     ui_done("Model {i} finished and data saved")
     h2o.rm(tmp_mod)
   },
   error = function(e) {
     usethis::ui_oops("Model {i} failed! {e}")
+    if ((i %% save_freq == 0 | i == nrow(grid)) & nrow(predictions) > 1) {
+      ui_info("Writing prediction data...")
+      fwrite(predictions, str_c(output_loc, data, "_gb_", tolower(response), "_predictions.csv"))
+    }
   })
 }
 
