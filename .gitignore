@@ -32,3 +32,6 @@ README.html
 deprecated/
 # the .ipynb_chckpoints
 .ipynb_checkpoints/
+
+# the html renderings of rmarkdown files
+*.html
