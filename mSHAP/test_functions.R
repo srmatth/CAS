@@ -1,4 +1,4 @@
-source("Multiplicative SHAP/functions.R")
+source("mSHAP/functions.R")
 library(tictoc)
 library(ggplot2)
 library(dplyr)
