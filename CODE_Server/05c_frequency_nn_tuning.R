@@ -12,26 +12,29 @@ output_loc <- "output/"
 # 3. Determine the Response (This shouldn't change)
 response <- "ULTIMATE_CLAIM_COUNT"
 
-# 4. Create a tuning grid
+# 4. Set a frequency to save the predictions
+save_freq <- 1
+
+# 5. Create a tuning grid
 grid <- expand.grid(
   list(
     activation = c("Tanh"),
     hidden = list(100, c(100, 100), c(200, 200), c(100, 100, 100)),
     adaptive_rate = FALSE,
-    rate = c(0.1, 0.01, 0.005, 0.001),
+    rate = c(0.1, 0.01, 0.005, 0.001, .0005),
     rate_decay = c(0.5),
     momentum_start = c(0.5),
     momentum_stable = 0.99,
     input_dropout_ratio = c(0.1),
-    initial_weight_distribution = c("Uniform", "Normal"),
-    initial_weight_scale = c(1, 2),
-    loss = c("Automatic", "Huber"),
-    distribution = c("gaussian", "gamma", "laplace", "huber"),
-    stopping_metric = "MAE",
-    stopping_tolerance = c("0.001"),
+    initial_weight_distribution = c("Normal"),
+    initial_weight_scale = c(1),
+    loss = c("Automatic"),
+    distribution = c("multinomial"),
+    stopping_metric = "logloss",
+    stopping_tolerance = 0.001,
     categorical_encoding = c("EnumLimited"),
     seed = 16,
-    mini_batch_size = c(10, 100)
+    mini_batch_size = c(100)
   ),
   stringsAsFactors = FALSE
 )
@@ -48,37 +51,70 @@ library(data.table)
 library(stringr)
 
 # start the h2o cluster
-h2o::h2o.init(max_mem_size = "50G")
+# h2o::h2o.init(max_mem_size = "50G")
 
 #### Data Loading and Manipulating ----
 
-ui_info("Reading in the data...")
-
-train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
-  mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
-  as.h2o()
-ui_done("Training data read in!")
-validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
-  mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
-  as.h2o()
-ui_done("Validation data read in!")
-test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
-  mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
-  as.h2o()
-ui_done("Test data read in!")
-
-ui_done("All data in!")
+# ui_info("Reading in the data...")
+# 
+# train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
+#   mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
+#   as.h2o()
+# ui_done("Training data read in!")
+# validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
+#   mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
+#   as.h2o()
+# ui_done("Validation data read in!")
+# test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
+#   mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
+#   as.h2o()
+# ui_done("Test data read in!")
+# 
+# ui_done("All data in!")
 
 #### Train Models and Record Results ----
 
 # initialize the data frames where we will save the results
-results <- data.frame(stringsAsFactors = FALSE)
-predictions <- data.frame(stringsAsFactors = FALSE)
+# results <- data.frame(stringsAsFactors = FALSE)
+# predictions <- data.frame(stringsAsFactors = FALSE)
+results <- fread(str_c(output_loc, data, "_nn_", tolower(response), "_tuning_results.csv"))
+predictions <- fread(str_c(output_loc, data, "_nn_", tolower(response), "_predictions.csv"))
 
 
 # run the loop across all rows of the training grid
 ui_info("Starting for loop....")
 for (i in 1:nrow(grid)) {
+  
+  tryCatch({
+    h2o::h2o.shutdown(prompt = FALSE)
+  },
+  error = function(e) {
+    ui_oops("H2O Was not yet running! {e}")
+  })
+  
+  ui_info("Sleeping for 10 seconds to properly restart H2O...")
+  Sys.sleep(10)
+  
+  h2o::h2o.init(max_mem_size = "50G")
+  
+  #### Data Loading and Manipulating ----
+  
+  ui_info("Reading in the data...")
+  
+  train <- fread(str_c(data_loc, data, "_train.csv"), stringsAsFactors = TRUE) %>%
+    mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
+    as.h2o()
+  ui_done("Training data read in!")
+  validate <- fread(str_c(data_loc, data, "_validate.csv"), stringsAsFactors = TRUE) %>%
+    mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
+    as.h2o()
+  ui_done("Validation data read in!")
+  test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE) %>%
+    mutate(ULTIMATE_CLAIM_COUNT = as.factor(ULTIMATE_CLAIM_COUNT)) %>%
+    as.h2o()
+  ui_done("Test data read in!")
+  
+  ui_done("All data in!")
   
   grid_sub <- grid %>% dplyr::slice(i)
   
@@ -164,11 +200,19 @@ for (i in 1:nrow(grid)) {
     results <- rbind(results, results_tmp)
     predictions <- rbind(predictions, predictions_tmp)
     write_csv(results, str_c(output_loc, data, "_nn_", tolower(response), "_tuning_results.csv"))
-    fwrite(predictions, str_c(output_loc, data, "_nn_", tolower(response), "_predictions.csv"))
+    if ((i %% save_freq == 0 | i == nrow(grid)) & nrow(predictions) > 1) {
+      ui_info("Writing prediction data...")
+      fwrite(predictions, str_c(output_loc, data, "_nn_", tolower(response), "_predictions.csv"))
+    }
     ui_done("Model {i} finished and data saved")
   },
   error = function(e) {
     usethis::ui_oops("Model {i} failed! {e}")
+    if ((i %% save_freq == 0 | i == nrow(grid)) & nrow(predictions) == (i * nrow(test))) {
+      ui_info("Writing prediction data...")
+      fwrite(predictions, str_c(output_loc, data, "_nn_", tolower(response), "_predictions.csv"))
+    }
+    h2o.shutdown(prompt = FALSE)
   })
 }
 

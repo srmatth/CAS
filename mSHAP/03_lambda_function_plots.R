@@ -34,13 +34,30 @@ lambdas %>%
   aes(x = as.factor(x), y = as.factor(y), fill = lambda1) +
   geom_tile() +
   scale_fill_viridis_c() +
+  xlab(expression(s[zij])) +
+  ylab(expression(k[zij])) +
+  labs(fill = expression(lambda[1])) +
   theme(
+    text = element_text(family = "Times New Roman"),
     axis.ticks = element_blank(),
     axis.text = element_blank(),
-    legend.position = "none"
+    legend.position = "top",
+    axis.title = element_text(
+      size = 24,
+      family = "Times New Roman"
+    ),
+    legend.title = element_text(
+      size = 18
+    ),
+    legend.text = element_text(size = 14)
   ) +
-  xlab(expression(s[zij])) +
-  ylab(expression(k[zij]))
+  guides(
+    fill = guide_colorbar(
+      barheight = unit(0.1, "in"),
+      barwidth = unit(3, "in"),
+      title.vjust = 1
+    )
+  )
 
 #### Lambda 2 ----
 
@@ -49,10 +66,27 @@ lambdas %>%
   aes(x = as.factor(x), y = as.factor(y), fill = lambda2) +
   geom_tile() +
   scale_fill_viridis_c() +
+  xlab(expression(s[zij])) +
+  ylab(expression(k[zij])) +
+  labs(fill = expression(lambda[2])) +
   theme(
+    text = element_text(family = "Times New Roman"),
     axis.ticks = element_blank(),
     axis.text = element_blank(),
-    legend.position = "none"
+    legend.position = "top",
+    axis.title = element_text(
+      size = 24,
+      family = "Times New Roman"
+    ),
+    legend.title = element_text(
+      size = 18
+    ),
+    legend.text = element_text(size = 14)
   ) +
-  xlab(expression(s[zij])) +
-  ylab(expression(k[zij]))
+  guides(
+    fill = guide_colorbar(
+      barheight = unit(0.1, "in"),
+      barwidth = unit(3, "in"),
+      title.vjust = 1
+    )
+  )
