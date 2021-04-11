@@ -1,4 +1,4 @@
-source("mSHAP/00a_functions_10_vars.R")
+source("mSHAP/00b_functions_arbitrary_vars.R")
 
 # Load Libraries
 library(tictoc)
@@ -9,19 +9,36 @@ library(reticulate)
 #### First Simulation ----
 
 # Create a data frame of values to map across
+# eqns <- list(
+#   y1 = c(
+#     "rowSums(X)",
+#     "rowMeans(X^2)"
+#   ),
+#   y2 = c(
+#     "rowSums(X^2)",
+#     "rowSums(2*X - X^2)",
+#     "rowMeans(exp(X))",
+#     "0.25 * rowSums((exp(X) / (X^2)))"
+#   ),
+#   theta1 = c(3),
+#   theta2 = c(10),
+#   n_var = c(20, 30, 40, 50)
+# ) %>%
+#   expand.grid(stringsAsFactors = FALSE)
+
 eqns <- list(
   y1 = c(
-    "rowSums(X)",
-    "x1 - x2 + x3 - x4 + x5 - x6 +x7 - x8 + x9 - x10"
+    "rowSums(X)"
   ),
   y2 = c(
-    "x1 * x2 + x3*x4 + x5*x6 + (x7*x8)/(x9 - x10)",
-    "(x1 + x2 + x3 + x4 + x5) / (x6 *x7 * x8 * x9 * x10)",
-    "x5 + x10",
-    "exp(x1 + x2 + x3 + x4 + x5) - (x6 +x7 + x8 + x9 + x10)"
+    "rowSums(X^2)",
+    "rowSums(2*X - X^2)",
+    "rowMeans(exp(X))",
+    "0.25 * rowSums((exp(X) / (X^2)))"
   ),
-  theta1 = seq(0.5, 20.5, by = 5),
-  theta2 = seq(1, 50, by = 10)
+  theta1 = c(3, 6, 9),
+  theta2 = c(10, 20, 30),
+  n_var = c(50)
 ) %>%
   expand.grid(stringsAsFactors = FALSE)
 
@@ -32,11 +49,11 @@ all_tests <- purrr::pmap_dfr(
   .f = test_multiplicative_shap,
   sample = 100L
 )
-toc() # 16542.71 seconds (~4.6 hours)
+toc() # 6870.8 seconds (~2 hours)
 
 # Write data to file, include code to read it back in again
-readr::write_csv(all_tests, "mSHAP/all_tests_results_10_vars.csv")
-all_tests <- readr::read_csv("mSHAP/all_tests_results_10_vars.csv")
+readr::write_csv(all_tests, "mSHAP/all_tests_results_arbitrary_vars_2.csv")
+all_tests <- readr::read_csv("mSHAP/all_tests_results_arbitrary_vars_2.csv")
 
 #### Distribute Alpha Winner ----
 
@@ -97,3 +114,23 @@ summary <- all_tests %>%
   arrange(desc(mean_score))
 
 View(summary)
+
+readr::read_csv("mSHAP/all_tests_results_10_vars.csv") %>%
+  dplyr::bind_rows(
+    readr::read_csv("mSHAP/all_tests_results_arbitrary_vars.csv")
+  ) %>%
+  dplyr::bind_rows(
+    readr::read_csv("mSHAP/all_tests_results_arbitrary_vars_2.csv")
+  ) %>% 
+  group_by(method) %>%
+  summarise(
+    mean_score = mean(score),
+    mean_dir_con = mean(direction_contrib),
+    mean_rel_val_con = mean(relative_mag_contrib),
+    mean_rank_con = mean(rank_contrib),
+    pct_same_sign = mean(pct_same_sign),
+    pct_same_rank = mean(pct_same_rank)
+  ) %>%
+  ungroup() %>%
+  arrange(desc(mean_score)) %>%
+  View()
