@@ -9,26 +9,10 @@ library(reticulate)
 #### First Simulation ----
 
 # Create a data frame of values to map across
-# eqns <- list(
-#   y1 = c(
-#     "rowSums(X)",
-#     "rowMeans(X^2)"
-#   ),
-#   y2 = c(
-#     "rowSums(X^2)",
-#     "rowSums(2*X - X^2)",
-#     "rowMeans(exp(X))",
-#     "0.25 * rowSums((exp(X) / (X^2)))"
-#   ),
-#   theta1 = c(3),
-#   theta2 = c(10),
-#   n_var = c(20, 30, 40, 50)
-# ) %>%
-#   expand.grid(stringsAsFactors = FALSE)
-
 eqns <- list(
   y1 = c(
-    "rowSums(X)"
+    "rowSums(X)",
+    "rowMeans(X^2)"
   ),
   y2 = c(
     "rowSums(X^2)",
@@ -36,11 +20,27 @@ eqns <- list(
     "rowMeans(exp(X))",
     "0.25 * rowSums((exp(X) / (X^2)))"
   ),
-  theta1 = c(3, 6, 9),
-  theta2 = c(10, 20, 30),
-  n_var = c(50)
+  theta1 = c(3),
+  theta2 = c(10),
+  n_var = c(10, 20, 30, 40, 50)
 ) %>%
   expand.grid(stringsAsFactors = FALSE)
+
+# eqns <- list(
+#   y1 = c(
+#     "rowSums(X)"
+#   ),
+#   y2 = c(
+#     "rowSums(X^2)",
+#     "rowSums(2*X - X^2)",
+#     "rowMeans(exp(X))",
+#     "0.25 * rowSums((exp(X) / (X^2)))"
+#   ),
+#   theta1 = c(3, 6, 9),
+#   theta2 = c(10, 20, 30),
+#   n_var = c(50)
+# ) %>%
+#   expand.grid(stringsAsFactors = FALSE)
 
 # simulate mSHAP and kernelSHAP on all rows of the created data frame
 tic("big one")
@@ -134,3 +134,33 @@ readr::read_csv("mSHAP/all_tests_results_10_vars.csv") %>%
   ungroup() %>%
   arrange(desc(mean_score)) %>%
   View()
+# readr::read_csv("mSHAP/all_tests_results_arbitrary_vars.csv") %>%
+#   rbind(all_tests) %>%
+#   readr::write_csv("mSHAP/all_tests_results_arbitrary_vars.csv")
+
+all_tests <- readr::read_csv("mSHAP/all_tests_results_arbitrary_vars.csv")
+
+all_tests%>% 
+  group_by(n_var, method) %>%
+  summarize(
+    mean_score = mean(score)
+  ) %>%
+  ungroup() %>%
+  filter(method != "weighted_raw") %>%
+  ggplot() +
+  aes(x = n_var, y = mean_score, color = method) +
+  # geom_point() +
+  # geom_line() +
+  scale_color_viridis_d() +
+  geom_smooth(se = FALSE) +
+  theme_classic() + 
+  xlab("Number of Variables") +
+  ylab("Avg Score") +
+  labs(color = "Method") +
+  theme(
+    legend.position = c(0.8, 0.8)
+  )
+
+
+
+

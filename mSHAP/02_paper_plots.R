@@ -3,14 +3,14 @@
 # This file will create the various plots used in the mSHAP paper
 
 ## Score Plots ----
-all_tests <- readr::read_csv("Multiplicative SHAP/all_tests_results.csv")
+all_tests <- readr::read_csv("mSHAP/all_tests_results.csv")
 
 all_tests %>% 
-  filter(
-    y1 == "x1 + x2 + x3",
-    y2 == "x1 + x2 + x3"
-  ) %>%
-  group_by(method, y1, y2, theta1, theta2) %>%
+  # filter(
+  #   y1 == "x1 + x2 + x3",
+  #   y2 == "x1 + x2 + x3"
+  # ) %>%
+  group_by(method, theta1, theta2) %>%
   summarize(score = mean(score)) %>%
   ungroup() %>%
   mutate(
@@ -40,11 +40,11 @@ all_tests %>%
   )
 
 all_tests %>% 
-  filter(
-    y1 == "x1 + x2 + x3",
-    y2 == "x1 + x2 + x3"
-  ) %>%
-  group_by(method, y1, y2, theta1, theta2) %>%
+  # filter(
+  #   y1 == "x1 + x2 + x3",
+  #   y2 == "x1 + x2 + x3"
+  # ) %>%
+  group_by(method, theta1, theta2) %>%
   summarize(score = mean(score)) %>%
   ungroup() %>%
   mutate(

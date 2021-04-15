@@ -105,7 +105,7 @@ summary <- all_tests %>%
   ungroup() %>%
   arrange(desc(mean_score))
 
-# View(summary)
+View(summary)
 
 #### Timing Simulations ----
 

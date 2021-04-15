@@ -30,9 +30,12 @@ multiply_shap <- function(shap1, shap2, ex1, ex2) {
   ) %>%
     magrittr::set_colnames(stringr::str_c("s", 1:ncol(shap1)))
   
-  expected_value <- d %>% 
-    rowSums() %>% 
-    mean()
+  preds_1 <- rowSums(shap1 %>% dplyr::mutate(ex_val = ex1))
+  preds_2 <- rowSums(shap2 %>% dplyr::mutate(ex_val = ex2))
+  
+  preds_3 <- preds_1 * preds_2
+  
+  expected_value <- mean(preds_3)
   
   # return a list with what we want
   list(
