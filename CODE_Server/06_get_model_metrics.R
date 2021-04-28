@@ -14,20 +14,21 @@ output_loc <- "output/"
 
 #### Setup ----
 
-usethis::ui_info("Loading Libraries")
+logger::log_info("Loading Libraries")
 library(dplyr)
 library(stringr)
 library(fs)
 library(data.table)
 library(usethis)
+library(logger)
 
-ui_info("Determining which files to read in...")
+log_info("Determining which files to read in...")
 severity_pred_files <- dir_ls(pred_loc) %>%
   str_subset(str_c(data, ".*severity_predictions.csv")) %>%
   str_subset("log", negate = TRUE)
 log_severity_pred_files <- dir_ls(pred_loc) %>%
   str_subset(str_c(data, ".*log_severity_predictions.csv"))
-all_severity_preds_files <- data.frame(
+all_severity_pred_files <- data.frame(
   file = severity_pred_files,
   transform = FALSE
 ) %>%
@@ -43,14 +44,14 @@ frequency_pred_files <- dir_ls(pred_loc) %>%
 
 #### Read in the Data ----
 
-ui_info("Reading in the test data!")
+log_info("Reading in the test data!")
 test <- fread(str_c(data_loc, data, "_test.csv"), stringsAsFactors = TRUE)
 
-ui_info("Reading in the Frequency Predictions.")
+log_info("Reading in the Frequency Predictions.")
 frequency_preds <- purrr::map_dfr(
   .x = frequency_pred_files,
   .f = ~{
-    ui_info("Reading in file: {.x}")
+    log_info("Reading in file: {.x}")
     fread(.x) %>%
       mutate(file = .x)
   }
@@ -58,7 +59,7 @@ frequency_preds <- purrr::map_dfr(
 
 #### Figure out all combinations ----
 
-ui_info("Getting unique frequency models...")
+log_info("Getting unique frequency models...")
 frequency_mods <- frequency_preds %>%
   select(file, mod_num) %>%
   distinct()
@@ -67,11 +68,11 @@ frequency_mods <- frequency_preds %>%
 
 results <- data.frame()
 for (i in 1:nrow(all_severity_pred_files)) {
-  ui_info("Starting loop {i} out of {nrow(all_severity_pred_files)}.")
+  log_info("Starting loop {i} out of {nrow(all_severity_pred_files)}.")
   curr_sev_file <- all_severity_pred_files %>%
     slice(i)
   
-  ui_info("Reading in file: {curr_sev_file$file}")
+  log_info("Reading in file: {curr_sev_file$file}")
   severity_preds <- fread(curr_sev_file$file) %>%
     mutate(file = curr_sev_file$file)
   # If it is a log_severity file, we want to untransform the response
@@ -80,7 +81,7 @@ for (i in 1:nrow(all_severity_pred_files)) {
       mutate(predict = exp(predict))
   }
   
-  ui_info("Getting unique models in {curr_sev_file$file}")
+  log_info("Getting unique models in {curr_sev_file$file}")
   severity_mods <- severity_preds %>%
     select(file, mod_num) %>%
     distinct()
@@ -88,20 +89,24 @@ for (i in 1:nrow(all_severity_pred_files)) {
   for (j in 1:nrow(severity_mods)) {
     sev_mod <- severity_mods %>%
       slice(j)
-    ui_info("Computing metrics for model {sev_mod$mod_num} from file {sev_mod$file} with all freq models")
+    log_info("Computing metrics for model {sev_mod$mod_num} from file {sev_mod$file} with all freq models")
     sev_mod_preds <- severity_preds %>%
       filter(
         file == sev_mod$file,
         mod_num == sev_mod$mod_num
       )
+    if (nrow(sev_mod_preds) > nrow(test)) sev_mod_preds <- sev_mod_preds[1,nrow(test),]
     for (k in 1:nrow(frequency_mods)) {
       freq_mod <- frequency_mods %>%
         slice(k)
-      combined_preds <- frequency_preds %>%
+      log_info("Working on frequency model {freq_mod$mod_num} from file {freq_mod$file}")
+      freq_mod_preds <- frequency_preds %>%
         filter(
           file == freq_mod$file,
           mod_num == freq_mod$mod_num
-        ) %>%
+        ) 
+      if (nrow(freq_mod_preds) > nrow(test)) freq_mod_preds <- freq_mod_preds[1,nrow(test),]
+      combined_preds <- freq_mod_preds %>%
         select(-predict) %>%
         left_join(sev_mod_preds, by = "row_num") %>%
         mutate(
@@ -113,6 +118,7 @@ for (i in 1:nrow(all_severity_pred_files)) {
             amount_3_claim * p3,
           actual_ultimate_amount = test$ULTIMATE_AMOUNT
         )
+      log_info("Predictions calculated and combined with actual!")
       
       results_tmp <- data.frame(
         sev_mod_file = sev_mod$file,
@@ -123,10 +129,12 @@ for (i in 1:nrow(all_severity_pred_files)) {
         mse = mean((combined_preds$actual_ultimate_amount - combined_preds$expected_ultimate_amount)^2),
         stringsAsFactors = FALSE
       )
+      log_info("metrics computed")
       
       results <- rbind(results, results_tmp)
       
       fwrite(results, str_c(output_loc, data, "_model_comparison.csv"))
+      log_success("metrics saved")
     }
   }
 }
