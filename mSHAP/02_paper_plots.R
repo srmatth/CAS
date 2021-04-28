@@ -74,7 +74,7 @@ all_tests %>%
   )
 
 ## Tiing Plots ----
-all_times_2_vars <- readr::read_csv("Multiplicative SHAP/all_times_2_vars.csv")
+all_times_2_vars <- readr::read_csv("mSHAP/all_times_2_vars.csv")
 
 all_times_2_vars %>%
   tidyr::pivot_longer(
@@ -93,13 +93,17 @@ all_times_2_vars %>%
   ggtitle("Comparison of Time by Method", "Number of Variables Fixed at 2") +
   labs(color = "Method") +
   theme(
-    legend.position = c(0.8, 0.4),
+    legend.position = c(0.7, 0.3),
     legend.box.background = element_rect(color = "#99A88C"),
-    plot.title = element_text(hjust = 0.5, vjust = 0.5, size = 14),
-    plot.subtitle = element_text(hjust = 0.5)
+    plot.title = element_text(hjust = 0.5, vjust = 0.5, size = 20),
+    plot.subtitle = element_text(hjust = 0.5, size = 18),
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 16)
   )
 
-all_times_100_sample <- readr::read_csv("Multiplicative SHAP/all_times_100_sample.csv")
+all_times_100_sample <- readr::read_csv("mSHAP/all_times_100_sample.csv")
 
 all_times_100_sample %>%
   tidyr::pivot_longer(
@@ -118,9 +122,13 @@ all_times_100_sample %>%
   ggtitle("Comparison of Time by Method", "Sample Size Fixed at 100") +
   labs(color = "Method") +
   theme(
-    legend.position = c(0.8, 0.4),
+    legend.position = c(0.7, 0.3),
     legend.box.background = element_rect(color = "#99A88C"),
-    plot.title = element_text(hjust = 0.5, vjust = 0.5, size = 14),
-    plot.subtitle = element_text(hjust = 0.5)
+    plot.title = element_text(hjust = 0.5, vjust = 0.5, size = 20),
+    plot.subtitle = element_text(hjust = 0.5, size = 18),
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 16)
   )
 
