@@ -25,6 +25,8 @@ library(purrr)
 library(furrr)
 library(future)
 
+options(future.globals.maxSize = 3145728000 * 7)
+
 log_info("Determining which files to read in...")
 severity_pred_files <- dir_ls(pred_loc) %>%
   str_subset(str_c(data, ".*severity_predictions.csv"))
@@ -35,7 +37,7 @@ all_files <- list(
   sev = severity_pred_files,
   freq = frequency_pred_files
 ) %>%
-  expand.grid()
+  expand.grid(stringsAsFactors = FALSE)
 
 #### Read in the Data ----
 
