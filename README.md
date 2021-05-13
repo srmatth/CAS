@@ -6,8 +6,25 @@ An R package for dealing with the CAS data.
 The acquire the Data you need to go through FIXME.
 
 In order to run the server scripts on the fiven server, ensure that you have the following packages installed
-```
-c(“dplyr", “purrr", “stringr", “usethis", “data.table", “fs", “tidyr", “ggplot2", “sparklyr", “tictoc", “BBmisc", “caret", “h2o", “readr", “rlang”)
+```{r}
+c(
+  “dplyr", 
+  “purrr", 
+  “stringr", 
+  “usethis", 
+  “data.table", 
+  “fs", 
+  “tidyr", 
+  “ggplot2", 
+  “sparklyr", 
+  “tictoc", 
+  “BBmisc", 
+  “caret", 
+  “h2o", 
+  “readr", 
+  “rlang”, 
+  "furrr"
+)
 ```
 
 ## The Data

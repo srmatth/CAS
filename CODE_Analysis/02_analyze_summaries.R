@@ -8,7 +8,7 @@
 data <- "bi"
 
 # 2. set the relative directory of the summaries (with forward slash at the end)
-path_to_summaries <- "inst/summaries/"
+path_to_summaries <- "output/summaries/"
 
 #### Setup ----
 

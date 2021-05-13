@@ -11,13 +11,13 @@ output_loc <- NULL
 
 # 3. set the configuration for the spark cluster
 conf <- list()
-conf$`sparklyr.cores.local` <- 4
-conf$`sparklyr.shell.driver-memory` <- "4G"
+conf$`sparklyr.cores.local` <- 16
+conf$`sparklyr.shell.driver-memory` <- "64G"
 conf$spark.memory.fraction <- 0.9
 
 #### Setup ----
 
-usethis::ui_info("Loading Libraries...")
+logger::log_info("Loading Libraries...")
 
 # Load libraries
 library(dplyr)
@@ -25,22 +25,21 @@ library(stringr)
 library(data.table)
 library(tidyr)
 library(ggplot2)
-library(usethis)
 library(sparklyr)
 library(tictoc)
 library(BBmisc)
 
-ui_done("Finished Loading Libraries.")
+logger::log_success("Finished Loading Libraries.")
 
-ui_info("Starting Spark")
+logger::log_info("Starting Spark")
 
 sc <- spark_connect(master = "local", version = "2.4.5", config = conf)
 
-ui_info("Initializing values and reading in the data...")
+logger::log_info("Initializing values and reading in the data...")
 
 df <- fread(str_c(data_loc, data, ".csv"))
 
-ui_done("Data in!")
+logger::log_success("Data in!")
 
 #### Factor Summarizing ----
 
@@ -63,10 +62,10 @@ sdf_gather <- function(data, key = "key", value = "value", ...) {
     sdf_register()
 }
 
-ui_info("Transferring Data to Spark Cluster")
+logger::log_info("Transferring Data to Spark Cluster")
 df_s <- spark_read_csv(sc = sc, name = "df_s", path = str_c(data_loc, data, ".csv"))
 
-ui_info("Beginning to summarize Factor Variables...")
+logger::log_info("Beginning to summarize Factor Variables...")
 fac_sum <- df_s %>%
   dplyr::mutate(
     EARNED_EXPOSURE = as.numeric(EARNED_EXPOSURE),
@@ -105,13 +104,13 @@ fac_sum <- df_s %>%
   collect()
 
 # Save the summary
-ui_info("Saving factor summaries...")
+logger::log_info("Saving factor summaries...")
 fwrite(fac_sum, str_c(output_loc, data, "_fac_sum.csv"))
-ui_done("Finished factor summaries!")
+logger::log_success("Finished factor summaries!")
 
 #### Numerical Summarizing ----
 
-ui_info("computing summary statistics for numeric variables...")
+logger::log_info("computing summary statistics for numeric variables...")
 num_sum <- summary(df$EARNED_EXPOSURE) %>%
   rbind(
     summary(df$ULTIMATE_CLAIM_COUNT)
@@ -125,52 +124,52 @@ num_sum <- summary(df$EARNED_EXPOSURE) %>%
   select(variable, everything())
 
 # save the summary
-ui_info("saving numeric variable summaries...")
+logger::log_info("saving numeric variable summaries...")
 fwrite(num_sum, str_c(output_loc, data, "_num_sum.csv"))
-ui_done("Done with the numeric summaries and data saved!")
+logger::log_success("Done with the numeric summaries and data saved!")
 
 #### Rows with Claims ----
 
-ui_info("Beginning summaries for filtered data...")
-
-# filter the data and create the new column of severity
-raw_data <- df %>%
-  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
-  mutate(severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT)
-
-ui_info("Beginning Violin Plots")
-# open the pdf for editing
-pdf(str_c(data, "_severity_violin_plots.pdf"))
-
-# note that variables 19, 34, and 46 have too many levels to plot
-for (i in stringr::str_c("X_VAR", c(1:18, 20:33, 35:45))) {
-  summary <- count(raw_data, !!rlang::sym(i))
-  
-  p <- ggplot(raw_data) +
-    geom_violin(aes(x = as.factor(!!rlang::sym(i)), y = severity)) +
-    xlab(i) +
-    ylab("Severity") +
-    theme_classic() 
-  if (nrow(summary) < 13) {
-    p <- p +
-      ggtitle(stringr::str_c("Severity vs. ",i), "(Counts for Each Level in Red)") +
-      geom_text(
-        data = summary, 
-        aes(x = as.factor(!!rlang::sym(i)), 
-            y = 8e05,
-            label = n),
-        colour = "red"
-      )
-  } else {
-    p <- p +
-      ggtitle(stringr::str_c("Severity vs. ",i))
-  }
-  
-  print(p)
-}
-
-dev.off()
-ui_done("Vioilin Plots done and images saved!")
+# logger::log_info("Beginning summaries for filtered data...")
+# 
+# # filter the data and create the new column of severity
+# raw_data <- df %>%
+#   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+#   mutate(severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT)
+# 
+# logger::log_info("Beginning Violin Plots")
+# # open the pdf for editing
+# pdf(str_c(data, "_severity_violin_plots.pdf"))
+# 
+# # note that variables 19, 34, and 46 have too many levels to plot
+# for (i in stringr::str_c("X_VAR", c(1:18, 20:33, 35:45))) {
+#   summary <- count(raw_data, !!rlang::sym(i))
+#   
+#   p <- ggplot(raw_data) +
+#     geom_violin(aes(x = as.factor(!!rlang::sym(i)), y = severity)) +
+#     xlab(i) +
+#     ylab("Severity") +
+#     theme_classic() 
+#   if (nrow(summary) < 13) {
+#     p <- p +
+#       ggtitle(stringr::str_c("Severity vs. ",i), "(Counts for Each Level in Red)") +
+#       geom_text(
+#         data = summary, 
+#         aes(x = as.factor(!!rlang::sym(i)), 
+#             y = 8e05,
+#             label = n),
+#         colour = "red"
+#       )
+#   } else {
+#     p <- p +
+#       ggtitle(stringr::str_c("Severity vs. ",i))
+#   }
+#   
+#   print(p)
+# }
+# 
+# dev.off()
+# logger::log_success("Vioilin Plots done and images saved!")
 
 #### Quit R and Spark ----
 
