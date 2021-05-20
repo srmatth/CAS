@@ -130,46 +130,46 @@ logger::log_success("Done with the numeric summaries and data saved!")
 
 #### Rows with Claims ----
 
-# logger::log_info("Beginning summaries for filtered data...")
-# 
-# # filter the data and create the new column of severity
-# raw_data <- df %>%
-#   filter(ULTIMATE_CLAIM_COUNT > 0) %>%
-#   mutate(severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT)
-# 
-# logger::log_info("Beginning Violin Plots")
-# # open the pdf for editing
-# pdf(str_c(data, "_severity_violin_plots.pdf"))
-# 
-# # note that variables 19, 34, and 46 have too many levels to plot
-# for (i in stringr::str_c("X_VAR", c(1:18, 20:33, 35:45))) {
-#   summary <- count(raw_data, !!rlang::sym(i))
-#   
-#   p <- ggplot(raw_data) +
-#     geom_violin(aes(x = as.factor(!!rlang::sym(i)), y = severity)) +
-#     xlab(i) +
-#     ylab("Severity") +
-#     theme_classic() 
-#   if (nrow(summary) < 13) {
-#     p <- p +
-#       ggtitle(stringr::str_c("Severity vs. ",i), "(Counts for Each Level in Red)") +
-#       geom_text(
-#         data = summary, 
-#         aes(x = as.factor(!!rlang::sym(i)), 
-#             y = 8e05,
-#             label = n),
-#         colour = "red"
-#       )
-#   } else {
-#     p <- p +
-#       ggtitle(stringr::str_c("Severity vs. ",i))
-#   }
-#   
-#   print(p)
-# }
-# 
-# dev.off()
-# logger::log_success("Vioilin Plots done and images saved!")
+logger::log_info("Beginning summaries for filtered data...")
+
+# filter the data and create the new column of severity
+raw_data <- df %>%
+  filter(ULTIMATE_CLAIM_COUNT > 0) %>%
+  mutate(severity = ULTIMATE_AMOUNT / ULTIMATE_CLAIM_COUNT)
+
+logger::log_info("Beginning Violin Plots")
+# open the pdf for editing
+pdf(str_c(data, "_severity_violin_plots.pdf"))
+
+# note that variables 19, 34, and 46 have too many levels to plot
+for (i in stringr::str_c("X_VAR", c(1:18, 20:33, 35:45))) {
+  summary <- count(raw_data, !!rlang::sym(i))
+
+  p <- ggplot(raw_data) +
+    geom_violin(aes(x = as.factor(!!rlang::sym(i)), y = severity)) +
+    xlab(i) +
+    ylab("Severity") +
+    theme_classic()
+  if (nrow(summary) < 13) {
+    p <- p +
+      ggtitle(stringr::str_c("Severity vs. ",i), "(Counts for Each Level in Red)") +
+      geom_text(
+        data = summary,
+        aes(x = as.factor(!!rlang::sym(i)),
+            y = 8e05,
+            label = n),
+        colour = "red"
+      )
+  } else {
+    p <- p +
+      ggtitle(stringr::str_c("Severity vs. ",i))
+  }
+
+  print(p)
+}
+
+dev.off()
+logger::log_success("Vioilin Plots done and images saved!")
 
 #### Quit R and Spark ----
 
