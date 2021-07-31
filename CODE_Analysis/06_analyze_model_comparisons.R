@@ -110,7 +110,7 @@ all_data %>%
   xlab("Logloss (of frequency model)") +
   ylab("MAE (of two-part model)") +
   ggtitle(
-    "MAE of two-part Model vs. Logloss of Frequency Model",
+    "MAE of two-part Model vs. Logloss of Frequency Model (BI Data)",
     "By Severity Model Type and Frequency Model Type"
   ) +
   scale_color_manual(
@@ -119,15 +119,24 @@ all_data %>%
   labs(color = "Severity Model Type") +
   scale_y_continuous(labels = scales::number_format(accuracy = 1, big.mark = ",")) +
   theme(
+    text = element_text(family = "Times New Roman"),
     legend.position = c(0.65, 0.8),
     legend.background = element_rect(
       color = "#540B0E"
     ),
     plot.title = element_text(
+      family = "Times New Roman",
       hjust = 0.5
     ),
     plot.subtitle = element_text(
+      family = "Times New Roman",
       hjust = 0.5
+    ),
+    legend.title = element_text(
+      family = "Times New Roman"
+    ),
+    legend.text = element_text(
+      family = "Times New Roman"
     )
   ) +
   guides(
@@ -139,12 +148,12 @@ all_data %>%
   )
 
 # Not a very useful plot
-# all_data %>%
-#   filter(sev_mod_type != "nn") %>%
-#   ggplot() +
-#   aes(x = sev_mae_valid, y = mae, color = freq_logloss) +
-#   geom_point() +
-#   facet_wrap(~sev_mod_type)
+all_data %>%
+  filter(!(sev_mod_type %in% c("nn", "lm"))) %>%
+  ggplot() +
+  aes(x = sev_mae_valid, y = mae, color = freq_logloss) +
+  geom_point() +
+  facet_wrap(~sev_mod_type)
 
 
 #### PD Data ----
@@ -253,7 +262,7 @@ all_data %>%
   xlab("Logloss (of frequency model)") +
   ylab("MAE (of two-part model)") +
   ggtitle(
-    "MAE of two-part Model vs. Logloss of Frequency Model",
+    "MAE of two-part Model vs. Logloss of Frequency Model (PD Data)",
     "By Severity Model Type and Frequency Model Type"
   ) +
   scale_color_manual(
@@ -262,15 +271,24 @@ all_data %>%
   labs(color = "Severity Model Type") +
   scale_y_continuous(labels = scales::number_format(accuracy = 1, big.mark = ",")) +
   theme(
+    text = element_text(family = "Times New Roman"),
     legend.position = c(0.65, 0.8),
     legend.background = element_rect(
       color = "#540B0E"
     ),
     plot.title = element_text(
+      family = "Times New Roman",
       hjust = 0.5
     ),
     plot.subtitle = element_text(
+      family = "Times New Roman",
       hjust = 0.5
+    ),
+    legend.title = element_text(
+      family = "Times New Roman"
+    ),
+    legend.text = element_text(
+      family = "Times New Roman"
     )
   ) +
   guides(
@@ -388,7 +406,7 @@ all_data %>%
   xlab("Logloss (of frequency model)") +
   ylab("MAE (of two-part model)") +
   ggtitle(
-    "MAE of two-part Model vs. Logloss of Frequency Model",
+    "MAE of two-part Model vs. Logloss of Frequency Model (COLL Data)",
     "By Severity Model Type and Frequency Model Type"
   ) +
   scale_color_manual(
@@ -397,15 +415,24 @@ all_data %>%
   labs(color = "Severity Model Type") +
   scale_y_continuous(labels = scales::number_format(accuracy = 1, big.mark = ",")) +
   theme(
+    text = element_text(family = "Times New Roman"),
     legend.position = c(0.65, 0.8),
     legend.background = element_rect(
       color = "#540B0E"
     ),
     plot.title = element_text(
+      family = "Times New Roman",
       hjust = 0.5
     ),
     plot.subtitle = element_text(
+      family = "Times New Roman",
       hjust = 0.5
+    ),
+    legend.title = element_text(
+      family = "Times New Roman"
+    ),
+    legend.text = element_text(
+      family = "Times New Roman"
     )
   ) +
   guides(

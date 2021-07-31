@@ -27,7 +27,7 @@ pd_new <- pd %>%
 
 # Get the best model that used tree based model for both parts
 best_tree_mod <- pd_new %>%
-  filter(
+  dplyr::filter(
     sev_mod_type == "gb" | sev_mod_type == "rf", 
     freq_mod_type == "rf" | freq_mod_type == "gb"
   ) %>%

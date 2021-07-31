@@ -3,6 +3,8 @@
 # please note that this requires the model to be a random forest or gradient boosted currently
 # also still not sure if this will work for the multinomial model...
 
+## UPDATE This file will not run currently
+
 #### User Inputs ----
 
 # 1. Choose the data set that you wish to use, "bi", "pd", or "coll"
