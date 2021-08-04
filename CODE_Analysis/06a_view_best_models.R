@@ -230,6 +230,8 @@ plot(density(sevs$med))
 mean(sevs$med > sev_perf$med)
 mean(sevs$avg > sev_perf$avg)
 
+min(sevs$med)
+
 # Get the tuning parameters for the best models
 
 freq_params <- readr::read_csv(
