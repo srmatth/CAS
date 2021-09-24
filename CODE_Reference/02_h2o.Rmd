@@ -1,0 +1,100 @@
+---
+title: "Using H2O with R"
+author: "Spencer Matthews"
+date: "1/26/2021"
+output:
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+# Introduction
+
+This document will describe how to install H2O on your local machine in order to run the machine learning models implemented in the `CODE_Server` directory of this repository.
+H2O is an Amazon product used heavily in AWS, but the R package is open source and can be used freely on your own machine.
+We do not use H2O in any way that requires a subscription or license.
+
+H2O is extremely powerful and robust, and in this repository we do not use all aspects of the framework.
+Thus, this guide will only cover what is needed for the code in this repository.
+Documentation for H2O is extensive and can be found on the [H2O documentation website](http://h2o-release.s3.amazonaws.com/h2o/master/1735/docs-website/index.html).
+
+# Getting Started
+
+## Installation
+
+To install or update H2O, please use the code below.
+```{r}
+# The following two commands remove any previously installed H2O packages for R.
+if ("package:h2o" %in% search()) { detach("package:h2o", unload=TRUE) }
+if ("h2o" %in% rownames(installed.packages())) { remove.packages("h2o") }
+
+# Then, we download, install and initialize the H2O package for R.
+install.packages("h2o", repos=(c("http://s3.amazonaws.com/h2o-release/h2o/master/1497/R", getOption("repos"))))
+```
+
+Note that if you have a current H2O instance running when you try to install, it will not uninstall and will lead to version mismatches between the R package version and the H2O cluster version.
+Furthermore, if this code is ran on a server where you do not have root access, there may be a version mismatch which will not cause errors but may lead to instability in your H2O cluster.
+
+## Initialize H2O
+
+One H2O is installed, we need to initialize H2O by running the following code:
+
+```{r}
+memory_size <- "50G"
+h2o::h2o.init(max_mem_size = memory_size)
+```
+
+The only option we generally set when initializing H2O is the memory size option, as this will determine how much data the models we create can handle.
+
+# Using H2O
+
+## Get Data into the H2O Instance
+
+In order to get data into the H2O instance, we simply use the `as.h2o()` function in the `{h2o}` package.
+
+```{r}
+mtcars_h <- mtcars %>%
+  as.h2o()
+```
+
+Once a dataset is in h2o format, it can be used by h2o to train models.
+
+## Machine Learning with H2O
+
+H2O is a robust machine learning framework, and comes pre-packaged with numerous different algorithms for machine learning.
+In this work, we used `h2o::h2o.randomForest()`, `h2o::h2o.gbm()` and `h2o::h2o.deeplearning()`.
+
+Extensive documentation can be found at the following links:
+
+* [Random Forest](https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.randomForest.html)
+* [Gradient Boosting Machine](https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.gbm.html)
+* [Neural Network](https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.deeplearning.html)
+
+Trained models can be evaluated by pulling metrics out with simple `{h2o}` functions such as 
+
+* `h2o::h2o.r2()` for the $R^2$ value. [See documentation](https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.r2.html)
+* `h2o::h2o.mse()` for the Mean Squared Error. [See Documentation](https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.mse.html)
+* `h2o::h2o.mae()` for the Mean Absolute Error. [See Documentation](https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.mae.html)
+* h2o::h2o.logloss()` for the logloss. [See Documentation](https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.logloss.html)
+
+Each of these functions has the option to compute the metric on the training set or the validation set of data (assuming a validation set of data was supplied when the model was trained).
+
+Predicting with a trained H2O model is simple.
+The `predict()` function works as expected but returns a H2O frame instead of a data frame, so piping the prediction into `as.data.frame()` will save a lot of trouble in later manipulations of the predictions.
+
+# Closing the Connection
+
+In order to finish working with H2O, run the following code to close your connection
+```{r}
+h2o::h2o.shutdown()
+```
+
+
+
+
+
+
