@@ -20,11 +20,11 @@ library(patchwork)
 
 ## Read in the data we want
 test <- read_csv(str_c(dat_dir, dataset, "_final_mod_test_data.csv")) %>%
-  select(-X1) # this is the row number that came from saving the data in python
+  select(-...1) # this is the row number that came from saving the data in python
 freq_preds <- read_csv(str_c(dat_dir, dataset, "_freq_preds_final_mod.csv")) %>%
-  select(-X1)
+  select(-...1)
 sev_preds <- read_csv(str_c(dat_dir, dataset, "_sev_preds_final_mod.csv")) %>%
-  select(-X1)
+  select(-...1)
 
 ## Create some basic plots regarding the predictions
 freq_preds %>%
@@ -110,12 +110,12 @@ freq_shap <- map(
   .x = dir_ls(dat_dir) %>% str_subset("freq_shap_values"),
   .f = ~{
     read_csv(.x) %>%
-      select(-X1) %>%
+      select(-...1) %>%
       set_colnames(colnames(test))
   }
 )
 sev_shap <- read_csv(str_c(dat_dir, dataset, "_sev_shap_values_final_mod.csv")) %>%
-  select(-X1) %>%
+  select(-...1) %>%
   set_colnames(colnames(test))
 
 ## Visualize individual shap values

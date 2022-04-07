@@ -269,7 +269,7 @@ all_data %>%
     values = c("#335C67", "#E09F3E")
   ) +
   labs(color = "Severity Model Type") +
-  scale_y_continuous(labels = scales::number_format(accuracy = 1, big.mark = ",")) +
+  # scale_y_continuous(labels = scales::number_format(accuracy = 1, big.mark = ",")) +
   theme(
     text = element_text(family = "Times New Roman"),
     legend.position = c(0.65, 0.8),
@@ -413,7 +413,7 @@ all_data %>%
     values = c("#335C67", "#E09F3E")
   ) +
   labs(color = "Severity Model Type") +
-  scale_y_continuous(labels = scales::number_format(accuracy = 1, big.mark = ",")) +
+  # scale_y_continuous(labels = scales::number_format(accuracy = 1, big.mark = ",")) +
   theme(
     text = element_text(family = "Times New Roman"),
     legend.position = c(0.65, 0.8),

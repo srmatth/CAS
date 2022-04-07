@@ -1,7 +1,7 @@
 #### Analyze PD Severity Tuning ####
 
 #### Setup ----
-dataset <- "pd" # or "bi" or "coll"
+dataset <- "coll" # or "bi" or "coll"
 # Noe that if the dataset is changed, limits on many of the plots will need
 # to be changed as well
 
@@ -82,6 +82,14 @@ nn_sev <- read_csv(
 # combine to affect the MAE
 rf_sev %>%
   # filter(min_split_improvement < 0.01) %>%
+  mutate(
+    min_split_improvement = case_when(
+      min_split_improvement == 0.01 ~ "0.01",
+      min_split_improvement == 0.001 ~ "0.001",
+      min_split_improvement == 0.0001 ~ "0.0001"
+    ),
+    mtries = ifelse(mtries == -1, "All", mtries)
+  ) %>%
   ggplot() +
   aes(x = max_depth, y = mae_valid, color = as.factor(mtries)) +
   geom_point() +
@@ -91,7 +99,7 @@ rf_sev %>%
     labeller = label_both
   ) +
   geom_smooth(se = FALSE) +
-  theme_bw() +
+  theme_classic() +
   xlab("Max Depth") +
   ylab("Validation MAE") +
   labs(color = "Mtry") +
@@ -128,16 +136,16 @@ rf_sev %>%
     )
   ) +
   scale_y_continuous(
-    limits = c(2700, 2850),
-    breaks = c(2700, 2750,2800, 2850),
-    minor_breaks = NULL,
-    labels = scales::number_format(accuracy = 1, big.mark = ",")
+    # limits = c(2700, 2850),
+    # breaks = c(2700, 2750,2800, 2850),
+    # minor_breaks = NULL,
+    #labels = scales::number_format(accuracy = 1, big.mark = ",")
   ) +
-  scale_color_viridis_d() +
-  ggtitle(
-    "Effect of Mtry and Max Depth on MAE",
-    "Faceted by Minimum Split Improvement"
-  )
+  scale_color_viridis_d() #+
+  # ggtitle(
+  #   "Effect of Mtry and Max Depth on MAE",
+  #   "Faceted by Minimum Split Improvement"
+  # )
 
 ## Create a heatmap for max depth and mtry showing MAE
 
@@ -202,22 +210,25 @@ rf_sev %>%
 gb_sev %>%
   # Filter for only the laplace distribution, since it did best
   filter(distribution == "laplace") %>%
+  mutate(
+    learn_rate = ifelse(learn_rate == 0.001, "0.001", "0.0001")
+  ) %>%
   ggplot() +
   aes(x = max_depth, y = mae_valid, color = as.factor(learn_rate)) +
   geom_point() +
   geom_jitter() +
   facet_wrap(~ntrees, labeller = label_both) +
   geom_smooth(method = "loess", se = FALSE) +
-  theme_bw() +
+  theme_classic() +
   scale_color_viridis_d() +
   labs(color = "Learn Rate") +
   xlab("Max Depth") +
   ylab("Validation MAE") +
   scale_y_continuous(
-    limits = c(2500, 2550),
-    breaks = c(2500, 2525, 2550),
-    minor_breaks = NULL,
-    labels = scales::number_format(accuracy = 1, big.mark = ",")
+    # limits = c(2500, 2550),
+    # breaks = c(2500, 2525, 2550),
+    # minor_breaks = NULL,
+    # labels = scales::number_format(accuracy = 1, big.mark = ",")
   ) +
   scale_x_continuous(
     limits = c(0, 10),
@@ -225,7 +236,7 @@ gb_sev %>%
     minor_breaks = NULL
   ) +
   theme(
-    legend.position = c(0.8, 0.85),
+    legend.position = c(0.85, 0.5),
     plot.title = element_text(
       hjust = 0.5,
       family = "Times New Roman",
@@ -255,11 +266,11 @@ gb_sev %>%
     strip.text = element_text(
       family = "Times New Roman"
     )
-  ) +
-  ggtitle(
-    "Effect of Max Depth and Learn Rate on MAE",
-    "Faceted by Num Trees"
-  )
+  ) #+
+  # ggtitle(
+  #   "Effect of Max Depth and Learn Rate on MAE",
+  #   "Faceted by Num Trees"
+  # )
   
 
 #### NN Severity Models ----
@@ -274,17 +285,17 @@ nn_sev %>%
   geom_jitter() +
   facet_wrap(~distribution, labeller = label_both) +
   geom_smooth(se = FALSE) +
-  theme_bw() +
+  theme_classic() +
   scale_y_continuous(
-    labels = scales::number_format(accuracy = 1, big.mark = ",")
+    #labels = scales::number_format(accuracy = 1, big.mark = ",")
   ) +
   labs(color = "Rate") +
   xlab("Total Nodes") +
   ylab("Validation MAE") +
-  ggtitle(
-    "Effect of Total Nodes and Rate on MAE",
-    "Faceted by Distribution"
-  ) +
+  # ggtitle(
+  #   "Effect of Total Nodes and Rate on MAE",
+  #   "Faceted by Distribution"
+  # ) +
   theme(
     legend.position = c(0.8, 0.85),
     plot.title = element_text(

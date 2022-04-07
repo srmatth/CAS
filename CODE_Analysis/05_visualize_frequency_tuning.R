@@ -1,7 +1,7 @@
 #### Analyze PD Severity Tuning ####
 
 #### Setup ----
-dataset <- "pd" # or "bi" or "coll"
+dataset <- "coll" # or "bi" or "coll"
 # Noe that if the dataset is changed, limits on many of the plots will need
 # to be changed as well
 
@@ -80,6 +80,13 @@ rf_freq %>%
 #### GB Frequency Models ----
 
 gb_freq %>%
+  mutate(
+    learn_rate = ifelse(
+      learn_rate == 0.001,
+      "0.001",
+      "0.0001"
+    )
+  ) %>%
   ggplot() +
   aes(x = max_depth, y = logloss, color = as.factor(learn_rate)) +
   geom_line(lwd = 1.5) +
@@ -96,6 +103,7 @@ gb_freq %>%
     )
   ) +
   theme(
+    text = element_text(family = "Times New Roman"),
     legend.position = c(0.3, 0.3),
     legend.background = element_rect(
       color = "black"
